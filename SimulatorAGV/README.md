@@ -62,12 +62,6 @@ pip install -r requirements.txt
 python main.py
 ```
 
-4. 使用 `test_mqtt.py` 测试MQTT连接：
-
-```bash
-python test_mqtt.py
-```
-
 ## VDA5050协议实现
 
 本项目实现了VDA5050 v2.0.0协议的核心功能：
