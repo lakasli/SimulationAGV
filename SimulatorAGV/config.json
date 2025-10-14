@@ -1,0 +1,21 @@
+{
+  "mqtt_broker": {
+    "host": "localhost",
+    "port": 1883,
+    "vda_interface": "uagv"
+  },
+  "vehicle": {
+    "serial_number": "s1",
+    "manufacturer": "python_agv",
+    "vda_version": "v2",
+    "vda_full_version": "2.0.0"
+  },
+  "settings": {
+    "map_id": "default",
+    "state_frequency": 1,
+    "visualization_frequency": 1,
+    "action_time": 1.0,
+    "robot_count": 1,
+    "speed": 0.05
+  }
+}
