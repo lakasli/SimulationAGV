@@ -49,7 +49,7 @@ class Vda5050AgvSimulator:
             print(f"处理MQTT消息时出错: {e}")
 
     def _signal_handler(self, signum, frame):
-        """信号处理器，用于优雅地关闭程序"""
+        """信号处理器，用于关闭程序"""
         print("\n接收到关闭信号，正在停止...")
         self.running = False
 
