@@ -1,0 +1,21 @@
+# Python地图编辑器模块依赖
+# 基础依赖（Python标准库，无需额外安装）
+# - json
+# - uuid
+# - http.server
+# - urllib.parse
+# - typing
+# - threading
+# - time
+# - dataclasses
+# - enum
+# - datetime
+# - signal
+# - argparse
+# - os
+# - sys
+
+# 如果需要额外功能，可以添加以下依赖：
+# requests>=2.25.0  # 用于HTTP客户端功能
+# numpy>=1.20.0     # 用于数值计算
+# pillow>=8.0.0     # 用于图像处理

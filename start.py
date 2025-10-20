@@ -1,222 +1,202 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-启动脚本 - 用于启动 Mosquitto MQTT broker 和虚拟 AGV 小车
-
-本脚本会启动以下两个组件：
-1. Mosquitto MQTT broker (D:\\mosquitto\\mosquitto.exe)
-2. 虚拟 AGV 小车 (通过运行 SimulatorAGV/main.py)
-
-使用方法：
-    python start.py
-
-注意事项：
-1. 确保 Mosquitto 已安装在 D:\\mosquitto\\ 目录下
-2. 确保已安装 Python 依赖包 (paho-mqtt)
-3. 确保端口 1883 (MQTT) 未被其他程序占用
+一键启动仿真小车和AGV地图查看器
 """
-
-import subprocess
-import sys
 import os
+import sys
+import subprocess
+import threading
 import time
 import signal
-import json
+import http.server
+import socketserver
+from pathlib import Path
 
-# 全局变量用于存储进程对象
-mosquitto_process = None
-agv_process = None
+# 全局变量存储进程
+processes = []
+servers = []
 
-
-def get_mqtt_topics():
-    """根据配置文件获取 MQTT 主题信息"""
-    try:
-        # 获取 SimulatorAGV 目录路径
-        simulator_dir = os.path.join(os.path.dirname(__file__), "SimulatorAGV")
-        config_path = os.path.join(simulator_dir, "config.json")
-        
-        # 检查配置文件是否存在
-        if not os.path.exists(config_path):
-            print(f"警告: 找不到配置文件: {config_path}")
-            return None
-        
-        # 读取配置文件
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        # 生成基础主题
-        base_topic = f"{config['mqtt_broker']['vda_interface']}/{config['vehicle']['vda_version']}/{config['vehicle']['manufacturer']}/{config['vehicle']['serial_number']}"
-        
-        # 生成各个主题
-        topics = {
-            'base': base_topic,
-            'connection': f"{base_topic}/connection",
-            'state': f"{base_topic}/state",
-            'visualization': f"{base_topic}/visualization",
-            'order': f"{base_topic}/order",
-            'instantActions': f"{base_topic}/instantActions"
-        }
-        
-        return topics, config
-    except Exception as e:
-        print(f"读取配置文件时出错: {e}")
-        return None, None
-
-def signal_handler(sig, frame):
-    """信号处理器，用于关闭所有进程"""
-    print("\n接收到关闭信号，正在停止所有进程...")
-    stop_processes()
+def signal_handler(signum, frame):
+    """信号处理器，用于优雅关闭所有服务"""
+    print("\n正在关闭所有服务...")
+    
+    # 停止HTTP服务器
+    for server in servers:
+        try:
+            server.shutdown()
+            print("HTTP服务器已停止")
+        except:
+            pass
+    
+    # 停止子进程
+    for process in processes:
+        try:
+            process.terminate()
+            process.wait(timeout=5)
+        except:
+            try:
+                process.kill()
+            except:
+                pass
+    
+    print("所有服务已停止")
     sys.exit(0)
 
-def stop_processes():
-    """停止所有启动的进程"""
-    global mosquitto_process, agv_process
-    
-    if agv_process and agv_process.poll() is None:
-        print("正在停止仿真 AGV 小车...")
-        agv_process.terminate()
-        try:
-            agv_process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            agv_process.kill()
-        print("仿真 AGV 小车已停止")
-    
-    if mosquitto_process and mosquitto_process.poll() is None:
-        print("正在停止 Mosquitto MQTT broker...")
-        mosquitto_process.terminate()
-        try:
-            mosquitto_process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            mosquitto_process.kill()
-        print("Mosquitto MQTT broker 已停止")
-
-def start_mosquitto():
-    """启动 Mosquitto MQTT broker"""
-    global mosquitto_process
-    
-    mosquitto_path = r"D:\mosquitto\mosquitto.exe"
-    
-    # 检查 Mosquitto 是否存在
-    if not os.path.exists(mosquitto_path):
-        print(f"错误: 找不到 Mosquitto 可执行文件: {mosquitto_path}")
-        print("请确保 Mosquitto 已安装在指定路径")
-        return False
-    
-    try:
-        print("正在启动 Mosquitto MQTT broker...")
-        # 启动 Mosquitto 进程
-        mosquitto_process = subprocess.Popen(
-            [mosquitto_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        print("Mosquitto MQTT broker 已启动")
-        return True
-    except Exception as e:
-        print(f"启动 Mosquitto 失败: {e}")
-        return False
-
 def start_agv_simulator():
-    """启动仿真 AGV 小车"""
-    global agv_process
-    
-    # 获取 SimulatorAGV 目录路径
-    simulator_dir = os.path.join(os.path.dirname(__file__), "SimulatorAGV")
-    main_script = os.path.join(simulator_dir, "main.py")
-    
-    # 检查 main.py 是否存在
-    if not os.path.exists(main_script):
-        print(f"错误: 找不到 AGV 模拟器主脚本: {main_script}")
-        return False
-    
+    """启动AGV仿真器"""
     try:
-        print("正在启动仿真 AGV 小车...")
-        # 启动 AGV 模拟器进程
-        agv_process = subprocess.Popen(
-            [sys.executable, main_script],
-            cwd=simulator_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        print("仿真 AGV 小车已启动")
-        return True
+        simulator_script = Path("SimulatorAGV/main.py")
+        if simulator_script.exists():
+            print(f"正在启动AGV仿真器: {simulator_script}")
+            cmd = [sys.executable, str(simulator_script)]
+            process = subprocess.Popen(
+                cmd, 
+                cwd="SimulatorAGV",
+                creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0
+            )
+            processes.append(process)
+            return True
+        else:
+            print(f"错误: AGV仿真器脚本不存在: {simulator_script}")
+            return False
     except Exception as e:
-        print(f"启动仿真 AGV 小车失败: {e}")
+        print(f"启动AGV仿真器失败: {e}")
+        return False
+
+def start_map_editor_api():
+    """启动地图编辑器API服务器"""
+    try:
+        api_script = Path("SimulatorViewer/editor_python/main.py")
+        scene_file = Path("SimulatorAGV/map_flie/testmap.scene")
+        
+        if not api_script.exists():
+            print(f"错误: API脚本不存在: {api_script}")
+            return False
+            
+        if not scene_file.exists():
+            print(f"错误: 场景文件不存在: {scene_file}")
+            return False
+        
+        print(f"正在启动地图编辑器API服务器...")
+        cmd = [
+            sys.executable, 
+            str(api_script),
+            "--host", "localhost",
+            "--port", "8001", 
+            "--scene-file", str(scene_file.absolute())
+        ]
+        
+        process = subprocess.Popen(
+            cmd, 
+            cwd="SimulatorViewer/editor_python",
+            creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0
+        )
+        processes.append(process)
+        return True
+        
+    except Exception as e:
+        print(f"启动地图编辑器API服务器失败: {e}")
+        return False
+
+def start_http_server():
+    """启动HTTP服务器提供地图查看器页面"""
+    try:
+        port = 8080
+        web_root = Path("SimulatorViewer")
+        
+        if not web_root.exists():
+            print(f"错误: Web根目录不存在: {web_root}")
+            return False
+        
+        print(f"正在启动HTTP服务器 (端口: {port})...")
+        
+        class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, directory=str(web_root), **kwargs)
+            
+            def log_message(self, format, *args):
+                # 减少日志输出
+                pass
+        
+        def run_server():
+            with socketserver.TCPServer(("", port), CustomHTTPRequestHandler) as httpd:
+                servers.append(httpd)
+                print(f"HTTP服务器已启动: http://localhost:{port}")
+                print(f"地图查看器地址: http://localhost:{port}/map_viewer.html")
+                httpd.serve_forever()
+        
+        # 在新线程中启动HTTP服务器
+        server_thread = threading.Thread(target=run_server, daemon=True)
+        server_thread.start()
+        return True
+        
+    except Exception as e:
+        print(f"启动HTTP服务器失败: {e}")
         return False
 
 def main():
     """主函数"""
-    print("=" * 50)
-    print("启动 Mosquitto MQTT broker 和虚拟 AGV 小车")
-    print("=" * 50)
-    
-    # 获取 MQTT 主题信息
-    topics, config = get_mqtt_topics()
-    if topics and config:
-        print(f"AGV 小车信息:")
-        print(f"  序列号: {config['vehicle']['serial_number']}")
-        print(f"  制造商: {config['vehicle']['manufacturer']}")
-        print(f"  VDA 版本: {config['vehicle']['vda_version']}")
-        print(f"  MQTT Broker: {config['mqtt_broker']['host']}:{config['mqtt_broker']['port']}")
-        print(f"  基础主题: {topics['base']}")
-        print(f"  状态主题: {topics['state']}")
-        print(f"  连接主题: {topics['connection']}")
-        print(f"  可视化主题: {topics['visualization']}")
-        print(f"  订单主题: {topics['order']}")
-        print(f"  即时动作主题: {topics['instantActions']}")
-        print("-" * 50)
-    else:
-        print("警告: 无法读取配置文件，将使用默认设置")
+    print("=== AGV仿真系统一键启动 ===")
+    print()
     
     # 注册信号处理器
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    # 启动 Mosquitto
-    if not start_mosquitto():
-        print("无法启动 Mosquitto，程序退出")
-        return
+    success_count = 0
     
-    # 等待几秒钟让 Mosquitto 完全启动
-    print("等待 Mosquitto 初始化...")
+    # 1. 启动AGV仿真器
+    print("1. 启动AGV仿真器...")
+    if start_agv_simulator():
+        success_count += 1
+        print("   ✓ AGV仿真器启动成功")
+    else:
+        print("   ✗ AGV仿真器启动失败")
+    
+    # 等待一下让仿真器启动
+    time.sleep(2)
+    
+    # 2. 启动地图编辑器API服务器
+    print("\n2. 启动地图编辑器API服务器...")
+    if start_map_editor_api():
+        success_count += 1
+        print("   ✓ API服务器启动成功")
+    else:
+        print("   ✗ API服务器启动失败")
+    
+    # 等待API服务器启动
     time.sleep(3)
     
-    # 启动 AGV 模拟器
-    if not start_agv_simulator():
-        print("无法启动虚拟 AGV 小车")
-        stop_processes()
-        return
+    # 3. 启动HTTP服务器
+    print("\n3. 启动HTTP服务器...")
+    if start_http_server():
+        success_count += 1
+        print("   ✓ HTTP服务器启动成功")
+    else:
+        print("   ✗ HTTP服务器启动失败")
     
-    print("\n" + "=" * 50)
-    print("所有组件已成功启动!")
-    print("Mosquitto MQTT broker 运行在 localhost:1883")
-    print("虚拟 AGV 小车已连接到 MQTT broker")
-    if topics:
-        print(f"状态主题: {topics['state']}")
-        print("您可以订阅此主题以查看 AGV 状态")
-    print("\n按 Ctrl+C 可以停止所有进程")
-    print("=" * 50)
+    # 等待HTTP服务器启动
+    time.sleep(1)
     
-    # 等待进程结束或接收到中断信号
-    try:
-        while True:
-            # 检查 Mosquitto 是否仍在运行
-            if mosquitto_process and mosquitto_process.poll() is not None:
-                print("Mosquitto MQTT broker 已退出")
-                break
-            
-            # 检查 AGV 模拟器是否仍在运行
-            if agv_process and agv_process.poll() is not None:
-                print("仿真 AGV 小车已退出")
-                break
-            
-            time.sleep(1)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        stop_processes()
+    print(f"\n=== 启动完成 ({success_count}/3 个服务成功启动) ===")
+    
+    if success_count > 0:
+        print("\n服务地址:")
+        if success_count >= 2:  # API服务器启动成功
+            print("  • API服务器: http://localhost:8001")
+        if success_count >= 3:  # HTTP服务器启动成功
+            print("  • 地图查看器: http://localhost:8080/map_viewer.html")
+        
+        print("\n按 Ctrl+C 停止所有服务")
+        
+        try:
+            # 保持主程序运行
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
+    else:
+        print("\n所有服务启动失败，程序退出")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

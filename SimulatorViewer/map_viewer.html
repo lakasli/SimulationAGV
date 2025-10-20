@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGV地图查看器</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            overflow: hidden;
+        }
+        
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .title {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .status {
+            font-size: 14px;
+            color: #ecf0f1;
+        }
+        
+        .canvas-container {
+            position: relative;
+            width: 100vw;
+            height: calc(100vh - 60px);
+            overflow: hidden;
+            background-color: #34495e;
+        }
+        
+        #mapCanvas {
+            display: block;
+            cursor: grab;
+            background-color: #2c3e50;
+        }
+        
+        #mapCanvas:active {
+            cursor: grabbing;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(52, 73, 94, 0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            min-width: 200px;
+            backdrop-filter: blur(5px);
+        }
+        
+        .info-item {
+            margin-bottom: 5px;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(52, 73, 94, 0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            backdrop-filter: blur(5px);
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="title">AGV地图查看器</div>
+        <div class="controls">
+            <button class="btn" onclick="loadMapData()">刷新地图</button>
+            <button class="btn" onclick="resetView()">重置视图</button>
+            <button class="btn" onclick="toggleGrid()">网格</button>
+            <div class="status" id="status">准备就绪</div>
+        </div>
+    </div>
+    
+    <div class="canvas-container">
+        <canvas id="mapCanvas"></canvas>
+        <div class="loading" id="loading" style="display: none;">正在加载地图数据...</div>
+        
+        <div class="info-panel">
+            <div class="info-item"><strong>地图信息</strong></div>
+            <div class="info-item">站点数量: <span id="pointCount">0</span></div>
+            <div class="info-item">路径数量: <span id="routeCount">0</span></div>
+            <div class="info-item">缩放: <span id="zoomLevel">100%</span></div>
+            <div class="info-item">坐标: <span id="mousePos">0, 0</span></div>
+        </div>
+        
+        <div class="legend">
+            <div style="margin-bottom: 10px;"><strong>图例</strong></div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #e74c3c;"></div>
+                <span>接驳点 (AP)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #f39c12;"></div>
+                <span>路标点 (LM)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #27ae60;"></div>
+                <span>充电点 (CP)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #3498db;"></div>
+                <span>普通路径</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let canvas, ctx;
+        let mapData = null;
+        let viewTransform = {
+            x: 0,
+            y: 0,
+            scale: 1
+        };
+        let isDragging = false;
+        let lastMousePos = { x: 0, y: 0 };
+        let showGrid = true;
+        
+        // API配置
+        const API_BASE_URL = 'http://localhost:8001/api';
+        
+        // 初始化
+        window.onload = function() {
+            initCanvas();
+            loadMapData();
+            setupEventListeners();
+        };
+        
+        function initCanvas() {
+            canvas = document.getElementById('mapCanvas');
+            ctx = canvas.getContext('2d');
+            
+            // 设置画布大小
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+        }
+        
+        function resizeCanvas() {
+            const container = document.querySelector('.canvas-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            
+            if (mapData) {
+                drawMap();
+            }
+        }
+        
+        function setupEventListeners() {
+            // 鼠标事件
+            canvas.addEventListener('mousedown', onMouseDown);
+            canvas.addEventListener('mousemove', onMouseMove);
+            canvas.addEventListener('mouseup', onMouseUp);
+            canvas.addEventListener('wheel', onWheel);
+            
+            // 防止右键菜单
+            canvas.addEventListener('contextmenu', e => e.preventDefault());
+        }
+        
+        // 鼠标事件处理
+        function onMouseDown(e) {
+            isDragging = true;
+            lastMousePos = getMousePos(e);
+            canvas.style.cursor = 'grabbing';
+        }
+        
+        function onMouseMove(e) {
+            const mousePos = getMousePos(e);
+            
+            // 更新鼠标坐标显示
+            const worldPos = screenToWorld(mousePos.x, mousePos.y);
+            document.getElementById('mousePos').textContent = 
+                `${worldPos.x.toFixed(2)}, ${worldPos.y.toFixed(2)}`;
+            
+            if (isDragging) {
+                const dx = mousePos.x - lastMousePos.x;
+                const dy = mousePos.y - lastMousePos.y;
+                
+                viewTransform.x += dx;
+                viewTransform.y += dy;
+                
+                drawMap();
+                lastMousePos = mousePos;
+            }
+        }
+        
+        function onMouseUp(e) {
+            isDragging = false;
+            canvas.style.cursor = 'grab';
+        }
+        
+        function onWheel(e) {
+            e.preventDefault();
+            
+            const mousePos = getMousePos(e);
+            const worldPos = screenToWorld(mousePos.x, mousePos.y);
+            
+            const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            const newScale = Math.max(0.1, Math.min(5, viewTransform.scale * scaleFactor));
+            
+            if (newScale !== viewTransform.scale) {
+                viewTransform.scale = newScale;
+                
+                // 保持鼠标位置不变
+                const newWorldPos = screenToWorld(mousePos.x, mousePos.y);
+                viewTransform.x += (worldPos.x - newWorldPos.x) * viewTransform.scale;
+                viewTransform.y += (worldPos.y - newWorldPos.y) * viewTransform.scale;
+                
+                updateZoomDisplay();
+                drawMap();
+            }
+        }
+        
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+        
+        function screenToWorld(screenX, screenY) {
+            return {
+                x: (screenX - viewTransform.x) / viewTransform.scale / 20, // 除以20来反向转换
+                y: (screenY - viewTransform.y) / viewTransform.scale / 20  // 除以20来反向转换
+            };
+        }
+        
+        function worldToScreen(worldX, worldY) {
+            return {
+                x: (worldX * 20) * viewTransform.scale + viewTransform.x, // 乘以20放大坐标
+                y: (worldY * 20) * viewTransform.scale + viewTransform.y  // 乘以20放大坐标
+            };
+        }
+        
+        // API调用
+        async function loadMapData() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('status').textContent = '正在加载...';
+                
+                const response = await fetch(`${API_BASE_URL}/scene/data`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                mapData = await response.json();
+                console.log('地图数据加载成功:', mapData);
+                
+                updateMapInfo();
+                fitMapToView();
+                drawMap();
+                
+                document.getElementById('status').textContent = '地图加载完成';
+            } catch (error) {
+                console.error('加载地图数据失败:', error);
+                document.getElementById('status').textContent = '加载失败: ' + error.message;
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+        
+        function updateMapInfo() {
+            if (!mapData) return;
+            
+            const pointCount = mapData.points ? mapData.points.length : 0;
+            const routeCount = mapData.routes ? mapData.routes.length : 0;
+            
+            document.getElementById('pointCount').textContent = pointCount;
+            document.getElementById('routeCount').textContent = routeCount;
+        }
+        
+        function fitMapToView() {
+            if (!mapData || !mapData.points || mapData.points.length === 0) return;
+            
+            // 计算地图边界（使用放大后的坐标）
+            let minX = Infinity, minY = Infinity;
+            let maxX = -Infinity, maxY = -Infinity;
+            
+            mapData.points.forEach(point => {
+                const scaledX = point.x * 20; // 放大20倍
+                const scaledY = point.y * 20; // 放大20倍
+                minX = Math.min(minX, scaledX);
+                minY = Math.min(minY, scaledY);
+                maxX = Math.max(maxX, scaledX);
+                maxY = Math.max(maxY, scaledY);
+            });
+            
+            const mapWidth = maxX - minX;
+            const mapHeight = maxY - minY;
+            const mapCenterX = (minX + maxX) / 2;
+            const mapCenterY = (minY + maxY) / 2;
+            
+            // 计算合适的缩放比例
+            const padding = 50;
+            const scaleX = (canvas.width - padding * 2) / mapWidth;
+            const scaleY = (canvas.height - padding * 2) / mapHeight;
+            viewTransform.scale = Math.min(scaleX, scaleY, 2);
+            
+            // 居中显示
+            viewTransform.x = canvas.width / 2 - mapCenterX * viewTransform.scale;
+            viewTransform.y = canvas.height / 2 - mapCenterY * viewTransform.scale;
+            
+            updateZoomDisplay();
+        }
+        
+        function updateZoomDisplay() {
+            document.getElementById('zoomLevel').textContent = 
+                Math.round(viewTransform.scale * 100) + '%';
+        }
+        
+        // 绘图函数
+        function drawMap() {
+            if (!mapData) return;
+            
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制网格
+            if (showGrid) {
+                drawGrid();
+            }
+            
+            // 绘制路径
+            if (mapData.routes) {
+                drawRoutes();
+            }
+            
+            // 绘制站点
+            if (mapData.points) {
+                drawPoints();
+            }
+        }
+        
+        function drawGrid() {
+            ctx.save();
+            ctx.strokeStyle = '#34495e';
+            ctx.lineWidth = 1;
+            
+            const gridSize = 50 * viewTransform.scale;
+            const offsetX = viewTransform.x % gridSize;
+            const offsetY = viewTransform.y % gridSize;
+            
+            // 垂直线
+            for (let x = offsetX; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            
+            // 水平线
+            for (let y = offsetY; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            ctx.restore();
+        }
+        
+        function drawPoints() {
+            mapData.points.forEach(point => {
+                const screenPos = worldToScreen(point.x, point.y);
+                
+                // 只绘制在视口内的点
+                if (screenPos.x < -20 || screenPos.x > canvas.width + 20 ||
+                    screenPos.y < -20 || screenPos.y > canvas.height + 20) {
+                    return;
+                }
+                
+                ctx.save();
+                
+                // 根据点的类型选择颜色
+                let color = '#95a5a6'; // 默认颜色
+                let size = 6;
+                
+                if (point.name) {
+                    if (point.name.startsWith('AP')) {
+                        color = '#e74c3c'; // 接驳点 - 红色
+                        size = 8;
+                    } else if (point.name.startsWith('LM')) {
+                        color = '#f39c12'; // 路标点 - 橙色
+                        size = 6;
+                    } else if (point.name.startsWith('CP')) {
+                        color = '#27ae60'; // 充电点 - 绿色
+                        size = 8;
+                    }
+                }
+                
+                // 绘制点
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(screenPos.x, screenPos.y, size, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // 绘制边框
+                ctx.strokeStyle = '#2c3e50';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // 绘制标签
+                if (viewTransform.scale > 0.5 && point.name) {
+                    ctx.fillStyle = '#ecf0f1';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(point.name, screenPos.x, screenPos.y - size - 5);
+                }
+                
+                ctx.restore();
+            });
+        }
+        
+        function drawRoutes() {
+            if (!mapData.points) return;
+            
+            // 创建点ID到点对象的映射
+            const pointMap = {};
+            mapData.points.forEach(point => {
+                pointMap[point.id] = point;
+            });
+            
+            mapData.routes.forEach(route => {
+                const fromPoint = pointMap[route.from];
+                const toPoint = pointMap[route.to];
+                
+                if (!fromPoint || !toPoint) return;
+                
+                const fromScreen = worldToScreen(fromPoint.x, fromPoint.y);
+                const toScreen = worldToScreen(toPoint.x, toPoint.y);
+                
+                ctx.save();
+                ctx.strokeStyle = '#3498db';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                
+                if (route.type === 'bezier3' && route.c1 && route.c2) {
+                    // 贝塞尔曲线
+                    const c1Screen = worldToScreen(route.c1.x, route.c1.y);
+                    const c2Screen = worldToScreen(route.c2.x, route.c2.y);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(fromScreen.x, fromScreen.y);
+                    ctx.bezierCurveTo(
+                        c1Screen.x, c1Screen.y,
+                        c2Screen.x, c2Screen.y,
+                        toScreen.x, toScreen.y
+                    );
+                    ctx.stroke();
+                } else {
+                    // 直线
+                    ctx.beginPath();
+                    ctx.moveTo(fromScreen.x, fromScreen.y);
+                    ctx.lineTo(toScreen.x, toScreen.y);
+                    ctx.stroke();
+                }
+                
+                // 绘制方向箭头
+                if (viewTransform.scale > 0.3) {
+                    drawArrow(fromScreen, toScreen);
+                }
+                
+                ctx.restore();
+            });
+        }
+        
+        function drawArrow(from, to) {
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            
+            if (length < 20) return;
+            
+            const angle = Math.atan2(dy, dx);
+            const arrowLength = 10;
+            const arrowAngle = Math.PI / 6;
+            
+            // 箭头位置（路径中点偏后一点）
+            const arrowX = from.x + dx * 0.7;
+            const arrowY = from.y + dy * 0.7;
+            
+            ctx.save();
+            ctx.fillStyle = '#3498db';
+            ctx.beginPath();
+            ctx.moveTo(arrowX, arrowY);
+            ctx.lineTo(
+                arrowX - arrowLength * Math.cos(angle - arrowAngle),
+                arrowY - arrowLength * Math.sin(angle - arrowAngle)
+            );
+            ctx.lineTo(
+                arrowX - arrowLength * Math.cos(angle + arrowAngle),
+                arrowY - arrowLength * Math.sin(angle + arrowAngle)
+            );
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+        
+        // 控制函数
+        function resetView() {
+            fitMapToView();
+            drawMap();
+        }
+        
+        function toggleGrid() {
+            showGrid = !showGrid;
+            drawMap();
+        }
+    </script>
+</body>
+</html>
