@@ -19,10 +19,14 @@ sys.path.insert(0, parent_dir)
 from services.editor_service import EditorService
 from models.map_models import Point, MapPointType, MapRouteType, MapAreaType, Rect
 from models.robot_models import RobotType, RobotStatus
+from logger_config import logger
 
 
 class MapEditorAPIHandler(BaseHTTPRequestHandler):
     """地图编辑器API处理器"""
+    
+    # 设置HTTP协议版本为1.1，解决前端ERR_INVALID_HTTP_RESPONSE问题
+    protocol_version = 'HTTP/1.1'
     
     def __init__(self, *args, editor_service: EditorService = None, **kwargs):
         self.editor_service = editor_service or EditorService()
@@ -30,33 +34,56 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
     
     def do_GET(self):
         """处理GET请求"""
+        logger.info(f"[API] 收到GET请求: {self.path}")
+        start_time = time.time()
+        
         try:
             parsed_url = urlparse(self.path)
             path = parsed_url.path
             query_params = parse_qs(parsed_url.query)
             
+            logger.info(f"[API] 解析路径: {path}, 查询参数: {query_params}")
+            
+            # 路由处理
             if path == '/api/scene/data':
+                logger.info("[API] 处理场景数据请求")
                 self._handle_get_scene_data()
+            elif path == '/api/robots':
+                logger.info("[API] 处理机器人列表请求")
+                self._handle_get_robots(query_params)
+            elif path.startswith('/api/robots/'):
+                robot_id = path.split('/')[-1]
+                logger.info(f"[API] 处理单个机器人请求: {robot_id}")
+                # 注意：_handle_get_robot函数不存在，需要实现或移除此路由
+                self._send_error(404, f"单个机器人API暂未实现: {robot_id}")
             elif path == '/api/points':
+                logger.info("[API] 处理点位列表请求")
                 self._handle_get_points(query_params)
             elif path == '/api/routes':
+                logger.info("[API] 处理路径列表请求")
                 self._handle_get_routes(query_params)
             elif path == '/api/areas':
+                logger.info("[API] 处理区域列表请求")
                 self._handle_get_areas(query_params)
-            elif path == '/api/robots':
-                self._handle_get_robots(query_params)
-            elif path == '/api/statistics':
-                self._handle_get_statistics()
-            elif path == '/api/search':
-                self._handle_search(query_params)
             else:
-                self._send_error(404, "API endpoint not found")
-                
+                logger.warning(f"[API] 未知的GET路径: {path}")
+                self._send_error(404, f"路径不存在: {path}")
+            
+            end_time = time.time()
+            logger.info(f"[API] GET请求处理完成，耗时: {(end_time - start_time)*1000:.2f}ms")
+            
         except Exception as e:
-            self._send_error(500, f"Internal server error: {str(e)}")
+            end_time = time.time()
+            logger.error(f"[API] GET请求处理失败，耗时: {(end_time - start_time)*1000:.2f}ms, 错误: {e}")
+            import traceback
+            traceback.print_exc()
+            self._send_error(500, f"服务器内部错误: {e}")
     
     def do_POST(self):
         """处理POST请求"""
+        logger.info(f"[API] 收到POST请求: {self.path}")
+        start_time = time.time()
+        
         try:
             parsed_url = urlparse(self.path)
             path = parsed_url.path
@@ -65,26 +92,52 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
             post_data = self.rfile.read(content_length).decode('utf-8')
             data = json.loads(post_data) if post_data else {}
             
+            logger.info(f"[API] POST解析路径: {path}, 数据长度: {len(post_data)}")
+            
             if path == '/api/scene/load':
+                logger.info("[API] 处理场景加载请求")
                 self._handle_load_scene(data)
             elif path == '/api/scene/save':
+                logger.info("[API] 处理场景保存请求")
                 self._handle_save_scene(data)
             elif path == '/api/points':
+                logger.info("[API] 处理创建点位请求")
                 self._handle_create_point(data)
             elif path == '/api/routes':
+                logger.info("[API] 处理创建路径请求")
                 self._handle_create_route(data)
             elif path == '/api/areas':
+                logger.info("[API] 处理创建区域请求")
                 self._handle_create_area(data)
             elif path == '/api/robots':
+                logger.info("[API] 处理创建机器人请求")
                 self._handle_create_robot(data)
+            elif path.startswith('/api/robots/') and path.endswith('/update'):
+                robot_id = path.split('/')[-2]
+                logger.info(f"[API] 处理修改机器人配置请求: {robot_id}")
+                self._handle_update_robot_config(robot_id, data)
+            elif path == '/api/logs':
+                logger.info("[API] 处理前端日志请求")
+                self._handle_frontend_log(data)
             else:
+                logger.warning(f"[API] 未知的POST路径: {path}")
                 self._send_error(404, "API endpoint not found")
+            
+            end_time = time.time()
+            logger.info(f"[API] POST请求处理完成，耗时: {(end_time - start_time)*1000:.2f}ms")
                 
         except Exception as e:
+            end_time = time.time()
+            logger.error(f"[API] POST请求处理失败，耗时: {(end_time - start_time)*1000:.2f}ms, 错误: {e}")
+            import traceback
+            traceback.print_exc()
             self._send_error(500, f"Internal server error: {str(e)}")
     
     def do_PUT(self):
         """处理PUT请求"""
+        logger.info(f"[API] 收到PUT请求: {self.path}")
+        start_time = time.time()
+        
         try:
             parsed_url = urlparse(self.path)
             path = parsed_url.path
@@ -93,50 +146,82 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
             post_data = self.rfile.read(content_length).decode('utf-8')
             data = json.loads(post_data) if post_data else {}
             
+            logger.info(f"[API] PUT解析路径: {path}, 数据长度: {len(post_data)}")
+            
             if path.startswith('/api/points/'):
                 point_id = path.split('/')[-1]
+                logger.info(f"[API] 处理更新点位请求: {point_id}")
                 self._handle_update_point(point_id, data)
             elif path.startswith('/api/routes/'):
                 route_id = path.split('/')[-1]
+                logger.info(f"[API] 处理更新路径请求: {route_id}")
                 self._handle_update_route(route_id, data)
             elif path.startswith('/api/areas/'):
                 area_id = path.split('/')[-1]
+                logger.info(f"[API] 处理更新区域请求: {area_id}")
                 self._handle_update_area(area_id, data)
             elif path.startswith('/api/robots/'):
                 robot_id = path.split('/')[-1]
+                logger.info(f"[API] 处理更新机器人请求: {robot_id}")
                 self._handle_update_robot(robot_id, data)
             else:
+                logger.warning(f"[API] 未知的PUT路径: {path}")
                 self._send_error(404, "API endpoint not found")
+            
+            end_time = time.time()
+            logger.info(f"[API] PUT请求处理完成，耗时: {(end_time - start_time)*1000:.2f}ms")
                 
         except Exception as e:
+            end_time = time.time()
+            logger.error(f"[API] PUT请求处理失败，耗时: {(end_time - start_time)*1000:.2f}ms, 错误: {e}")
+            import traceback
+            traceback.print_exc()
             self._send_error(500, f"Internal server error: {str(e)}")
     
     def do_DELETE(self):
         """处理DELETE请求"""
+        logger.info(f"[API] 收到DELETE请求: {self.path}")
+        start_time = time.time()
+        
         try:
             parsed_url = urlparse(self.path)
             path = parsed_url.path
             
+            logger.info(f"[API] DELETE解析路径: {path}")
+            
             if path.startswith('/api/points/'):
                 point_id = path.split('/')[-1]
+                logger.info(f"[API] 处理删除点位请求: {point_id}")
                 self._handle_delete_point(point_id)
             elif path.startswith('/api/routes/'):
                 route_id = path.split('/')[-1]
+                logger.info(f"[API] 处理删除路径请求: {route_id}")
                 self._handle_delete_route(route_id)
             elif path.startswith('/api/areas/'):
                 area_id = path.split('/')[-1]
+                logger.info(f"[API] 处理删除区域请求: {area_id}")
                 self._handle_delete_area(area_id)
             elif path.startswith('/api/robots/'):
                 robot_id = path.split('/')[-1]
+                logger.info(f"[API] 处理删除机器人请求: {robot_id}")
                 self._handle_delete_robot(robot_id)
             else:
+                logger.warning(f"[API] 未知的DELETE路径: {path}")
                 self._send_error(404, "API endpoint not found")
+            
+            end_time = time.time()
+            logger.info(f"[API] DELETE请求处理完成，耗时: {(end_time - start_time)*1000:.2f}ms")
                 
         except Exception as e:
+            end_time = time.time()
+            logger.error(f"[API] DELETE请求处理失败，耗时: {(end_time - start_time)*1000:.2f}ms, 错误: {e}")
+            import traceback
+            traceback.print_exc()
             self._send_error(500, f"Internal server error: {str(e)}")
     
     def do_OPTIONS(self):
         """处理OPTIONS请求（CORS预检）"""
+        self.send_response(200)
         self._send_cors_headers()
         self.end_headers()
     
@@ -144,24 +229,40 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
         """发送CORS头"""
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control')
     
     def _send_json_response(self, data: Any, status_code: int = 200):
         """发送JSON响应"""
         try:
+            json_data = json.dumps(data, ensure_ascii=False, indent=2)
+            json_bytes = json_data.encode('utf-8')
+            
+            # 发送响应状态行
             self.send_response(status_code)
+            
+            # 发送必要的HTTP头
             self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Content-Length', str(len(json_bytes)))
+            
+            # 发送CORS头
             self._send_cors_headers()
+            
+            # 发送连接头
+            self.send_header('Connection', 'close')  # 改为close避免keep-alive问题
+            
+            # 结束头部
             self.end_headers()
             
-            json_data = json.dumps(data, ensure_ascii=False, indent=2)
-            self.wfile.write(json_data.encode('utf-8'))
+            # 发送响应体
+            self.wfile.write(json_bytes)
+            self.wfile.flush()  # 确保数据被发送
+            
         except (ConnectionResetError, BrokenPipeError, OSError) as e:
             # 客户端断开连接，记录日志但不抛出异常
-            print(f"客户端连接断开: {e}")
+            logger.warning(f"客户端连接断开: {e}")
         except Exception as e:
             # 其他异常，记录详细信息
-            print(f"发送响应时出错: {e}")
+            logger.error(f"发送响应时出错: {e}")
             import traceback
             traceback.print_exc()
     
@@ -173,13 +274,36 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
             "status_code": status_code
         }
         try:
-            self._send_json_response(error_data, status_code)
+            # 发送响应状态行
+            self.send_response(status_code)
+            
+            # 准备JSON数据
+            json_data = json.dumps(error_data, ensure_ascii=False, indent=2)
+            json_bytes = json_data.encode('utf-8')
+            
+            # 发送必要的HTTP头
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Content-Length', str(len(json_bytes)))
+            
+            # 发送CORS头
+            self._send_cors_headers()
+            
+            # 发送连接头
+            self.send_header('Connection', 'close')
+            
+            # 结束头部
+            self.end_headers()
+            
+            # 发送响应体
+            self.wfile.write(json_bytes)
+            self.wfile.flush()
+            
         except (ConnectionResetError, BrokenPipeError, OSError) as e:
             # 客户端断开连接，记录日志但不抛出异常
-            print(f"发送错误响应时客户端连接断开: {e}")
+            logger.warning(f"发送错误响应时客户端连接断开: {e}")
         except Exception as e:
             # 其他异常，记录详细信息
-            print(f"发送错误响应时出错: {e}")
+            logger.error(f"发送错误响应时出错: {e}")
             import traceback
             traceback.print_exc()
     
@@ -193,17 +317,9 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
             else:
                 self._send_json_response({"message": "No scene data loaded"})
         except Exception as e:
-            print(f"获取场景数据失败: {e}")
-            import traceback
-            traceback.print_exc()
-            try:
-                self._send_error(500, f"获取场景数据失败: {str(e)}")
-            except (ConnectionResetError, BrokenPipeError, OSError):
-                # 客户端已断开连接，无需发送错误响应
-                print("客户端连接已断开，无法发送错误响应")
-            except Exception as send_error:
-                print(f"发送错误响应失败: {send_error}")
-    
+            logger.error(f"获取场景数据失败: {e}")
+            self._send_error(500, f"获取场景数据失败: {e}")
+
     def _handle_load_scene(self, data: Dict[str, Any]):
         """加载场景"""
         file_path = data.get('file_path')
@@ -376,50 +492,485 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
     
     # 机器人相关API
     def _handle_get_robots(self, query_params: Dict[str, list]):
-        """获取机器人列表"""
-        robots = self.editor_service.robot_service.get_robots()
-        robots_data = [robot.__dict__ for robot in robots]
-        self._send_json_response(robots_data)
+        """获取机器人列表 - 每次都从registered_robots.json文件重新加载"""
+        try:
+            # 每次请求都从JSON文件重新加载机器人数据，确保数据是最新的
+            self._load_robots_from_file()
+            
+            robots = self.editor_service.robot_service.get_robots()
+            robots_data = []
+            
+            for robot in robots:
+                robot_dict = {
+                    "id": robot.id,
+                    "name": robot.label,
+                    "type": robot.type.name if robot.type else "TYPE_1",
+                    "ip": robot.ip,
+                    "status": robot.status.value if robot.status else "offline",
+                    "position": robot.position or {"x": 0, "y": 0, "rotate": 0},
+                    "battery": robot.battery or 100.0,
+                    "maxSpeed": robot.speed or 2.0,
+                    "brand": robot.brand or "",
+                    "gid": robot.gid or "default",
+                    "is_warning": robot.is_warning,
+                    "is_fault": robot.is_fault,
+                    "last_update": robot.last_update,
+                    "config": robot.config or {},
+                    "properties": robot.properties or {}
+                }
+                robots_data.append(robot_dict)
+            
+            logger.info(f"从JSON文件加载了 {len(robots_data)} 个机器人")
+            self._send_json_response(robots_data)
+        except Exception as e:
+            logger.error(f"获取机器人列表失败: {e}")
+            self._send_error(500, f"获取机器人列表失败: {e}")
+
+    def _save_robots_to_file(self):
+        """保存机器人数据到JSON文件"""
+        try:
+            logger.info("开始保存机器人数据到文件...")
+            # 修正路径计算，确保指向正确的SimAGVList目录
+            base_dir = os.path.dirname(os.path.dirname(current_dir))  # 到 SimulatorViewer
+            robots_dir = os.path.join(base_dir, "SimAGVList")
+            logger.info(f"机器人目录: {robots_dir}")
+            os.makedirs(robots_dir, exist_ok=True)
+            
+            # 保存机器人数据
+            robots_file = os.path.join(robots_dir, "registered_robots.json")
+            logger.info(f"机器人文件路径: {robots_file}")
+            robots = self.editor_service.robot_service.get_robots()
+            logger.info(f"获取到的机器人数量: {len(robots)}")
+            
+            robots_data = []
+            for robot in robots:
+                robot_dict = {
+                    "id": robot.id,
+                    "name": robot.label,
+                    "type": robot.type.name if robot.type else "TYPE_1",
+                    "ip": robot.ip,
+                    "status": robot.status.value if robot.status else "offline",
+                    "position": robot.position or {"x": 0, "y": 0, "rotate": 0},
+                    "battery": robot.battery or 100.0,
+                    "maxSpeed": robot.speed or 2.0,
+                    "brand": robot.brand or "",
+                    "gid": robot.gid or "default",
+                    "is_warning": robot.is_warning,
+                    "is_fault": robot.is_fault,
+                    "last_update": robot.last_update,
+                    "config": robot.config or {},
+                    "properties": robot.properties or {}
+                }
+                robots_data.append(robot_dict)
+            
+            with open(robots_file, 'w', encoding='utf-8') as f:
+                json.dump(robots_data, f, ensure_ascii=False, indent=2)
+            logger.info("机器人数据保存成功!")
+                
+        except Exception as e:
+            logger.error(f"保存机器人数据失败: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _load_robots_from_file(self):
+        """从JSON文件加载机器人数据"""
+        try:
+            # 修正路径计算，确保指向正确的SimAGVList目录
+            # current_dir 是 api 目录，需要向上两级到 SimulatorViewer，然后进入 SimAGVList
+            base_dir = os.path.dirname(os.path.dirname(current_dir))  # 到 SimulatorViewer
+            robots_dir = os.path.join(base_dir, "SimAGVList")
+            robots_file = os.path.join(robots_dir, "registered_robots.json")
+            
+            print(f"[DEBUG] 尝试从文件加载机器人数据: {robots_file}")
+            
+            if os.path.exists(robots_file):
+                with open(robots_file, 'r', encoding='utf-8') as f:
+                    robots_data = json.load(f)
+                
+                print(f"[DEBUG] 成功读取到 {len(robots_data)} 个机器人数据")
+                
+                from models.robot_models import RobotInfo, RobotStatus, RobotType
+                
+                # 清空现有机器人数据
+                self.editor_service.robot_service.robots.clear()
+                
+                # 加载机器人数据
+                for robot_data in robots_data:
+                    try:
+                        robot_type = RobotType.TYPE_1
+                        if robot_data.get('type'):
+                            try:
+                                robot_type = RobotType[robot_data['type']]
+                            except KeyError:
+                                robot_type = RobotType.TYPE_1
+                        
+                        robot_status = RobotStatus.OFFLINE
+                        if robot_data.get('status'):
+                            try:
+                                robot_status = RobotStatus(robot_data['status'])
+                            except ValueError:
+                                robot_status = RobotStatus.OFFLINE
+                        
+                        robot_info = RobotInfo(
+                            id=robot_data['id'],
+                            label=robot_data['name'],
+                            gid=robot_data.get('gid', 'default'),
+                            brand=robot_data.get('brand', ''),
+                            type=robot_type,
+                            ip=robot_data['ip'],
+                            status=robot_status,
+                            position=robot_data.get('position', {"x": 0, "y": 0, "rotate": 0}),
+                            battery=robot_data.get('battery', 100.0),
+                            speed=robot_data.get('maxSpeed', 2.0),
+                            is_warning=robot_data.get('is_warning', False),
+                            is_fault=robot_data.get('is_fault', False),
+                            last_update=robot_data.get('last_update'),
+                            config=robot_data.get('config', {}),
+                            properties=robot_data.get('properties', {})
+                        )
+                        
+                        self.editor_service.robot_service.robots[robot_info.id] = robot_info
+                        print(f"[DEBUG] 成功加载机器人: {robot_info.label} (ID: {robot_info.id})")
+                        
+                    except Exception as e:
+                        print(f"加载机器人数据失败 {robot_data.get('id', 'unknown')}: {e}")
+                        
+                print(f"[DEBUG] 机器人数据加载完成，共加载 {len(self.editor_service.robot_service.robots)} 个机器人")
+            else:
+                print(f"[DEBUG] 机器人数据文件不存在: {robots_file}")
+                        
+        except Exception as e:
+            print(f"从文件加载机器人数据失败: {e}")
+            import traceback
+            traceback.print_exc()
     
     def _handle_create_robot(self, data: Dict[str, Any]):
         """创建机器人"""
-        # 这里需要根据实际需求实现机器人创建逻辑
-        self._send_json_response({"success": False, "message": "Robot creation not implemented"})
-    
+        try:
+            from models.robot_models import RobotInfo, RobotStatus, RobotType
+            
+            # 1. 基础数据验证
+            if not isinstance(data, dict):
+                self._send_error(400, "无效的数据类型")
+                return
+            
+            # 2. 验证必需字段
+            required_fields = ['name', 'type', 'ip']
+            missing_fields = [field for field in required_fields if field not in data]
+            if missing_fields:
+                self._send_error(400, f"缺少必需字段: {', '.join(missing_fields)}")
+                return
+            
+            # 3. 基础字段验证
+            robot_name = str(data['name']).strip()
+            robot_ip = str(data['ip']).strip()
+            
+            if not robot_name:
+                self._send_error(400, "机器人名称不能为空")
+                return
+            
+            if not robot_ip:
+                self._send_error(400, "IP地址不能为空")
+                return
+            
+            # 4. 检查唯一性
+            existing_robots = self.editor_service.robot_service.get_robots()
+            for existing_robot in existing_robots:
+                if existing_robot.label == robot_name:
+                    self._send_error(409, f"机器人名称 '{robot_name}' 已存在")
+                    return
+                if existing_robot.ip == robot_ip:
+                    self._send_error(409, f"IP地址 '{robot_ip}' 已被使用")
+                    return
+            
+            # 5. 创建机器人
+            robot_id = str(uuid.uuid4())
+            robot_info = RobotInfo(
+                id=robot_id,
+                label=robot_name,
+                gid=data.get('gid', "default"),
+                brand=data.get('brand', ''),
+                type=RobotType.TYPE_1,
+                ip=robot_ip,
+                status=RobotStatus.OFFLINE,
+                position=data.get('position', {"x": 0, "y": 0, "rotate": 0}),
+                battery=float(data.get('battery', 100.0)),
+                speed=float(data.get('maxSpeed', 2.0)),
+                is_warning=data.get('is_warning', False),
+                is_fault=data.get('is_fault', False),
+                last_update=None,
+                config=data.get('config', {}),
+                properties=data.get('properties', {})
+            )
+            
+            # 6. 保存机器人
+            self.editor_service.robot_service.robots[robot_id] = robot_info
+            self._save_robots_to_file()
+            
+            # 7. 返回成功响应
+            response_data = {
+                "success": True,
+                "robot_id": robot_id,
+                "message": "Robot registered successfully",
+                "robot_info": {
+                    "id": robot_id,
+                    "name": robot_name,
+                    "ip": robot_ip,
+                    "type": data['type'],
+                    "status": "offline"
+                }
+            }
+            self._send_json_response(response_data)
+                
+        except ImportError as e:
+            error_msg = f"导入模块失败: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            print(f"[CREATE_ROBOT] 导入错误: {error_msg}")
+            self._send_error(500, "服务器配置错误，请联系管理员")
+            
+        except KeyError as e:
+            error_msg = f"访问字典键时发生错误: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            print(f"[CREATE_ROBOT] 键错误: {error_msg}")
+            self._send_error(400, f"请求数据格式错误: 缺少或无效的字段 {str(e)}")
+            
+        except ValueError as e:
+            error_msg = f"数据值错误: {str(e)}"
+            logger.error(error_msg, exc_info=True)  
+            print(f"[CREATE_ROBOT] 值错误: {error_msg}")
+            self._send_error(400, f"数据格式错误: {str(e)}")
+            
+        except TypeError as e:
+            error_msg = f"数据类型错误: {str(e)}"
+            logger.error(error_msg, exc_info=True)  
+            print(f"[CREATE_ROBOT] 类型错误: {error_msg}")
+            self._send_error(400, f"数据类型错误: {str(e)}")
+            
+        except PermissionError as e:
+            error_msg = f"文件权限错误: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            print(f"[CREATE_ROBOT] 权限错误: {error_msg}")
+            self._send_error(500, "服务器文件权限错误，请联系管理员")
+            
+        except OSError as e:
+            error_msg = f"操作系统错误: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            print(f"[CREATE_ROBOT] 系统错误: {error_msg}")
+            self._send_error(500, "服务器系统错误，请联系管理员")
+            
+        except Exception as e:
+            error_msg = f"创建机器人时发生未预期的错误: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            print(f"[CREATE_ROBOT] 未预期错误: {error_msg}")
+            import traceback
+            traceback.print_exc()
+            self._send_error(500, "服务器内部错误，请稍后重试或联系管理员")
+        
+        finally:
+            print(f"[CREATE_ROBOT] 函数执行完成")
+
+    def _handle_update_robot_config(self, robot_id: str, data: Dict[str, Any]):
+        """处理修改机器人配置的POST请求"""
+        try:
+            logger.info(f"开始处理机器人配置修改请求: {robot_id}")
+            
+            # 1. 先从文件加载最新数据
+            self._load_robots_from_file()
+            
+            # 2. 检查机器人是否存在
+            if robot_id not in self.editor_service.robot_service.robots:
+                logger.warning(f"机器人 {robot_id} 不存在")
+                self._send_error(404, f"机器人 {robot_id} 不存在")
+                return
+            
+            # 3. 获取当前机器人信息
+            robot = self.editor_service.robot_service.robots[robot_id]
+            logger.info(f"找到机器人: {robot.label}")
+            
+            # 4. 验证和更新字段
+            updated_fields = []
+            
+            # 更新基本信息
+            if 'name' in data and data['name'] != robot.label:
+                # 检查名称唯一性
+                for existing_id, existing_robot in self.editor_service.robot_service.robots.items():
+                    if existing_id != robot_id and existing_robot.label == data['name']:
+                        self._send_error(409, f"机器人名称 '{data['name']}' 已存在")
+                        return
+                robot.label = data['name']
+                updated_fields.append('name')
+            
+            if 'ip' in data and data['ip'] != robot.ip:
+                # 检查IP唯一性
+                for existing_id, existing_robot in self.editor_service.robot_service.robots.items():
+                    if existing_id != robot_id and existing_robot.ip == data['ip']:
+                        self._send_error(409, f"IP地址 '{data['ip']}' 已被使用")
+                        return
+                robot.ip = data['ip']
+                updated_fields.append('ip')
+            
+            if 'gid' in data:
+                robot.gid = data['gid']
+                updated_fields.append('gid')
+            
+            if 'brand' in data:
+                robot.brand = data['brand']
+                updated_fields.append('brand')
+            
+            if 'maxSpeed' in data:
+                robot.speed = float(data['maxSpeed'])
+                updated_fields.append('maxSpeed')
+            
+            if 'battery' in data:
+                robot.battery = float(data['battery'])
+                updated_fields.append('battery')
+            
+            if 'position' in data:
+                robot.position = data['position']
+                updated_fields.append('position')
+            
+            if 'is_warning' in data:
+                robot.is_warning = bool(data['is_warning'])
+                updated_fields.append('is_warning')
+            
+            if 'is_fault' in data:
+                robot.is_fault = bool(data['is_fault'])
+                updated_fields.append('is_fault')
+            
+            if 'config' in data:
+                robot.config = data['config']
+                updated_fields.append('config')
+            
+            if 'properties' in data:
+                robot.properties = data['properties']
+                updated_fields.append('properties')
+            
+            # 5. 更新时间戳
+            import datetime
+            robot.last_update = datetime.datetime.now().isoformat()
+            
+            # 6. 保存到文件
+            self._save_robots_to_file()
+            
+            # 7. 返回成功响应
+            response_data = {
+                "success": True,
+                "message": "机器人配置更新成功",
+                "robot_id": robot_id,
+                "updated_fields": updated_fields,
+                "robot_info": {
+                    "id": robot.id,
+                    "name": robot.label,
+                    "type": robot.type.name if robot.type else "TYPE_1",
+                    "ip": robot.ip,
+                    "status": robot.status.value if robot.status else "offline",
+                    "position": robot.position,
+                    "battery": robot.battery,
+                    "maxSpeed": robot.speed,
+                    "brand": robot.brand,
+                    "gid": robot.gid,
+                    "is_warning": robot.is_warning,
+                    "is_fault": robot.is_fault,
+                    "last_update": robot.last_update,
+                    "config": robot.config,
+                    "properties": robot.properties
+                }
+            }
+            
+            logger.info(f"机器人配置更新成功: {robot_id}, 更新字段: {updated_fields}")
+            self._send_json_response(response_data)
+            
+        except ValueError as e:
+            error_msg = f"数据格式错误: {str(e)}"
+            logger.error(error_msg)
+            self._send_error(400, error_msg)
+            
+        except Exception as e:
+            error_msg = f"更新机器人配置失败: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            self._send_error(500, error_msg)
+
     def _handle_update_robot(self, robot_id: str, data: Dict[str, Any]):
-        """更新机器人"""
-        success = self.editor_service.robot_service.update_robot(robot_id, data)
-        if success:
-            self.editor_service.mark_modified()
-        self._send_json_response({"success": success})
-    
+        """更新机器人信息"""
+        try:
+            # 先从文件加载最新数据
+            self._load_robots_from_file()
+            
+            # 检查机器人是否存在
+            if robot_id not in self.editor_service.robot_service.robots:
+                self._send_error(404, f"机器人 {robot_id} 不存在")
+                return
+            
+            # 更新机器人信息
+            success = self.editor_service.robot_service.update_robot(robot_id, data)
+            if success:
+                # 保存到文件
+                self._save_robots_to_file()
+                self._send_json_response({"success": True, "message": "机器人信息更新成功"})
+            else:
+                self._send_error(400, "更新机器人信息失败")
+                
+        except Exception as e:
+            logger.error(f"更新机器人失败: {e}")
+            self._send_error(500, f"更新机器人失败: {e}")
+
     def _handle_delete_robot(self, robot_id: str):
         """删除机器人"""
-        success = self.editor_service.robot_service.remove_robots([robot_id])
-        if success:
-            self.editor_service.mark_modified()
-        self._send_json_response({"success": success > 0})
-    
-    # 其他API
-    def _handle_get_statistics(self):
-        """获取统计信息"""
-        stats = self.editor_service.get_scene_statistics()
-        self._send_json_response(stats)
-    
-    def _handle_search(self, query_params: Dict[str, list]):
-        """搜索"""
-        keyword = query_params.get('q', [''])[0]
-        if not keyword:
-            self._send_error(400, "Missing search keyword")
-            return
-        
-        results = self.editor_service.search_all(keyword)
-        # 转换为字典格式
-        results_data = {}
-        for key, items in results.items():
-            results_data[key] = [item.__dict__ for item in items]
-        
-        self._send_json_response(results_data)
+        try:
+            # 先从文件加载最新数据
+            self._load_robots_from_file()
+            
+            # 检查机器人是否存在
+            if robot_id not in self.editor_service.robot_service.robots:
+                self._send_error(404, f"机器人 {robot_id} 不存在")
+                return
+            
+            # 删除机器人
+            removed_count = self.editor_service.robot_service.remove_robots([robot_id])
+            if removed_count > 0:
+                # 保存到文件
+                self._save_robots_to_file()
+                self._send_json_response({"success": True, "message": "机器人删除成功"})
+            else:
+                self._send_error(400, "删除机器人失败")
+                
+        except Exception as e:
+            logger.error(f"删除机器人失败: {e}")
+            self._send_error(500, f"删除机器人失败: {e}")
+
+    def _handle_frontend_log(self, data: Dict[str, Any]):
+        """处理前端日志请求"""
+        try:
+            # 提取日志信息
+            level = data.get('level', 'INFO')
+            message = data.get('message', '')
+            log_data = data.get('data')
+            timestamp = data.get('timestamp', '')
+            source = data.get('source', 'frontend')
+            
+            # 构建日志消息
+            log_message = f"[{timestamp}] [{source.upper()}] {message}"
+            
+            # 根据日志级别记录到后端日志
+            if level.upper() == 'ERROR':
+                logger.error(log_message)
+                if log_data:
+                    logger.error(f"[{source.upper()}] 错误详情: {log_data}")
+            elif level.upper() == 'WARNING' or level.upper() == 'WARN':
+                logger.warning(log_message)
+                if log_data:
+                    logger.warning(f"[{source.upper()}] 警告详情: {log_data}")
+            else:
+                logger.info(log_message)
+                if log_data:
+                    logger.info(f"[{source.upper()}] 数据详情: {log_data}")
+            
+            # 返回成功响应
+            self._send_json_response({"success": True, "message": "日志记录成功"})
+            
+        except Exception as e:
+            logger.error(f"处理前端日志失败: {e}")
+            self._send_json_response({"success": False, "message": f"日志记录失败: {e}"}, 500)
 
 
 class MapEditorAPIServer:
@@ -452,9 +1003,18 @@ class MapEditorAPIServer:
             handler_class = self.create_handler()
             self.server = HTTPServer((self.host, self.port), handler_class)
             
+            # 设置服务器超时
+            self.server.timeout = 30
+            self.server.socket.settimeout(30)
+            
             def run_server():
                 print(f"Map Editor API Server started at http://{self.host}:{self.port}")
-                self.server.serve_forever()
+                try:
+                    self.server.serve_forever()
+                except Exception as e:
+                    print(f"服务器运行错误: {e}")
+                    import traceback
+                    traceback.print_exc()
             
             self.server_thread = threading.Thread(target=run_server, daemon=True)
             self.server_thread.start()
@@ -466,7 +1026,7 @@ class MapEditorAPIServer:
         except Exception as e:
             print(f"Failed to start API server: {e}")
             raise
-    
+        
     def stop(self):
         """停止服务器"""
         if not self.is_running:

@@ -10,6 +10,7 @@ from vda5050.visualization import Visualization
 from vda5050.order import Order
 from vda5050.instant_actions import InstantActions
 from utils import get_timestamp, get_distance
+from logger_config import logger
 
 
 class AgvSimulator:
@@ -107,7 +108,7 @@ class AgvSimulator:
 
     def _handle_init_position_action(self, action):
         """处理位置初始化动作"""
-        print(f"执行位置初始化动作: {action.action_id}")
+        logger.info(f"执行位置初始化动作: {action.action_id}")
         
         # 提取参数
         x, y, theta, map_id, last_node_id = 0.0, 0.0, 0.0, "", ""
@@ -159,7 +160,7 @@ class AgvSimulator:
                 if distance < 0.1:
                     self.state.last_node_id = target_node.node_id
                     self.state.last_node_sequence_id = target_node.sequence_id
-                    print(f"到达节点: {target_node.node_id}")
+                    logger.info(f"到达节点: {target_node.node_id}")
                 else:
                     # 向目标节点移动
                     speed = self.config['settings']['speed']
@@ -177,13 +178,13 @@ class AgvSimulator:
                         self.state.agv_position.y += direction_y * speed
                         self.state.driving = True
                         
-                        print(f"向节点 {target_node.node_id} 移动: ({self.state.agv_position.x:.2f}, {self.state.agv_position.y:.2f})")
+                        logger.debug(f"向节点 {target_node.node_id} 移动: ({self.state.agv_position.x:.2f}, {self.state.agv_position.y:.2f})")
                     else:
                         self.state.driving = False
 
     def accept_order(self, order: Order):
         """接受订单"""
-        print(f"接受订单: {order.order_id}")
+        logger.info(f"接受订单: {order.order_id}")
         self.current_order = order
         
         # 更新状态信息
@@ -230,7 +231,7 @@ class AgvSimulator:
 
     def accept_instant_actions(self, instant_actions: InstantActions):
         """接受即时动作"""
-        print(f"接受即时动作")
+        logger.info(f"接受即时动作")
         self.instant_actions = instant_actions
         
         # 添加动作状态

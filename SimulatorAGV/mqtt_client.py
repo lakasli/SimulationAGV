@@ -5,6 +5,7 @@ import time
 
 from vda5050.order import Order
 from vda5050.instant_actions import InstantActions
+from logger_config import logger
 
 
 class MqttClient:
@@ -29,25 +30,25 @@ class MqttClient:
     def _on_connect(self, client, userdata, flags, rc):
         """连接回调"""
         if rc == 0:
-            print("成功连接到MQTT代理")
+            logger.info("成功连接到MQTT代理")
             self._subscribe_to_topics()
         else:
-            print(f"连接失败，错误代码: {rc}")
+            logger.error(f"连接失败，错误代码: {rc}")
 
     def _on_message(self, client, userdata, msg):
         """消息回调"""
         try:
             payload = msg.payload.decode('utf-8')
-            print(f"收到消息 - 主题: {msg.topic}, 内容: {payload}")
+            logger.debug(f"收到消息 - 主题: {msg.topic}, 内容: {payload}")
             
             # 调用外部回调处理消息
             self.message_callback(msg.topic, payload)
         except Exception as e:
-            print(f"处理消息时出错: {e}")
+            logger.error(f"处理消息时出错: {e}")
 
     def _on_disconnect(self, client, userdata, rc):
         """断开连接回调"""
-        print("与MQTT代理断开连接")
+        logger.info("与MQTT代理断开连接")
 
     def _subscribe_to_topics(self):
         """订阅相关主题"""
@@ -57,13 +58,13 @@ class MqttClient:
         order_topic = f"{base_topic}/order"
         self.client.subscribe(order_topic)
         self.subscribed_topics.append(order_topic)
-        print(f"已订阅订单主题: {order_topic}")
+        logger.info(f"已订阅订单主题: {order_topic}")
         
         # 订阅即时动作主题
         instant_actions_topic = f"{base_topic}/instantActions"
         self.client.subscribe(instant_actions_topic)
         self.subscribed_topics.append(instant_actions_topic)
-        print(f"已订阅即时动作主题: {instant_actions_topic}")
+        logger.info(f"已订阅即时动作主题: {instant_actions_topic}")
 
     def _generate_base_topic(self) -> str:
         """生成基础MQTT主题"""
@@ -74,28 +75,28 @@ class MqttClient:
         try:
             host = self.config['mqtt_broker']['host']
             port = self.config['mqtt_broker']['port']
-            print(f"正在连接到MQTT代理 {host}:{port}")
+            logger.info(f"正在连接到MQTT代理 {host}:{port}")
             self.client.connect(host, port, 60)
             self.client.loop_start()
         except Exception as e:
-            print(f"连接MQTT代理失败: {e}")
+            logger.error(f"连接MQTT代理失败: {e}")
 
     def disconnect(self):
         """断开与MQTT代理的连接"""
         self.client.loop_stop()
         self.client.disconnect()
-        print("已断开与MQTT代理的连接")
+        logger.info("已断开与MQTT代理的连接")
 
     def publish(self, topic: str, payload: str, qos: int = 0, retain: bool = False):
         """发布消息"""
         try:
             result = self.client.publish(topic, payload, qos=qos, retain=retain)
             if result.rc != mqtt.MQTT_ERR_SUCCESS:
-                print(f"发布消息失败，错误代码: {result.rc}")
+                logger.error(f"发布消息失败，错误代码: {result.rc}")
             else:
-                print(f"成功发布消息到 {topic}")
+                logger.debug(f"成功发布消息到 {topic}")
         except Exception as e:
-            print(f"发布消息时出错: {e}")
+            logger.error(f"发布消息时出错: {e}")
 
     def handle_order_message(self, payload: str) -> Order:
         """处理订单消息"""
@@ -104,7 +105,7 @@ class MqttClient:
             order = Order.from_dict(data)
             return order
         except Exception as e:
-            print(f"解析订单消息失败: {e}")
+            logger.error(f"解析订单消息失败: {e}")
             return None
 
     def handle_instant_actions_message(self, payload: str) -> InstantActions:
@@ -114,5 +115,5 @@ class MqttClient:
             instant_actions = InstantActions.from_dict(data)
             return instant_actions
         except Exception as e:
-            print(f"解析即时动作消息失败: {e}")
+            logger.error(f"解析即时动作消息失败: {e}")
             return None

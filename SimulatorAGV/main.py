@@ -11,10 +11,17 @@ from utils import load_config
 from agv_simulator import AgvSimulator
 from mqtt_client import MqttClient
 from vda5050.connection import Connection
+from logger_config import logger
 
 
 class Vda5050AgvSimulator:
-    def __init__(self, config_path: str = "config.json"):
+    def __init__(self, config_path: str = None):
+        # 如果没有指定配置路径，使用默认路径
+        if config_path is None:
+            # 获取当前文件所在目录
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            config_path = os.path.join(current_dir, "config.json")
+        
         # 加载配置
         self.config = load_config(config_path)
         
@@ -44,18 +51,18 @@ class Vda5050AgvSimulator:
                 if instant_actions:
                     self.agv_simulator.accept_instant_actions(instant_actions)
             else:
-                print(f"未知主题的消息: {topic}")
+                logger.warning(f"未知主题的消息: {topic}")
         except Exception as e:
-            print(f"处理MQTT消息时出错: {e}")
+            logger.error(f"处理MQTT消息时出错: {e}")
 
     def _signal_handler(self, signum, frame):
         """信号处理器，用于关闭程序"""
-        print("\n接收到关闭信号，正在停止...")
+        logger.info("\n接收到关闭信号，正在停止...")
         self.running = False
 
     def start(self):
         """启动AGV模拟器"""
-        print("启动VDA5050 AGV模拟器...")
+        logger.info("启动VDA5050 AGV模拟器...")
         
         # 连接到MQTT代理
         self.mqtt_client.connect()
@@ -79,13 +86,13 @@ class Vda5050AgvSimulator:
                 # 等待指定的时间间隔
                 time.sleep(1.0 / self.config['settings']['state_frequency'])
             except Exception as e:
-                print(f"运行时出错: {e}")
+                logger.error(f"运行时出错: {e}")
                 time.sleep(1)
 
         # 程序结束前发布离线消息
         self._publish_connection_message(Connection.CONNECTION_STATE_OFFLINE)
         self.mqtt_client.disconnect()
-        print("AGV模拟器已停止")
+        logger.info("AGV模拟器已停止")
 
     def _publish_connection_message(self, state: str):
         """发布连接消息"""

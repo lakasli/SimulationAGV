@@ -1,0 +1,48 @@
+[
+  {
+    "id": "64726678-e076-41a5-a679-75c7800f5052",
+    "name": "TestRobot_Updated",
+    "type": "TYPE_1",
+    "ip": "192.168.1.99",
+    "status": "offline",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "rotate": 0
+    },
+    "battery": 85,
+    "maxSpeed": 3.5,
+    "brand": "TestBrand",
+    "gid": "test_group",
+    "is_warning": false,
+    "is_fault": false,
+    "last_update": "2025-10-21T17:52:39.350639",
+    "config": {
+      "orientation": 5
+    },
+    "properties": {
+      "test_property": "test_prop_value"
+    }
+  },
+  {
+    "id": "6554ec6f-d694-464b-8f24-a10164b42fec",
+    "name": "TestRobot2",
+    "type": "TYPE_1",
+    "ip": "192.168.1.101",
+    "status": "offline",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "rotate": 0
+    },
+    "battery": 100.0,
+    "maxSpeed": 2.0,
+    "brand": "",
+    "gid": "default",
+    "is_warning": false,
+    "is_fault": false,
+    "last_update": null,
+    "config": {},
+    "properties": {}
+  }
+]

@@ -94,11 +94,13 @@ class RobotService:
         
         return True
     
-    def remove_robots(self, robot_ids: List[str]) -> None:
+    def remove_robots(self, robot_ids: List[str]) -> int:
         """删除机器人"""
+        removed_count = 0
         for robot_id in robot_ids:
             if robot_id in self.robots:
                 del self.robots[robot_id]
+                removed_count += 1
         
         # 从组中移除
         for group in self.robot_groups.values():
@@ -107,6 +109,8 @@ class RobotService:
         # 从标签中移除
         for label in self.robot_labels.values():
             label.robots = [rid for rid in label.robots if rid in self.robots]
+        
+        return removed_count
     
     def update_robots(self, robot_ids: List[str], updates: Dict[str, Any]) -> int:
         """批量更新机器人"""

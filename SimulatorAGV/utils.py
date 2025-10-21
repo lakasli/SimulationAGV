@@ -1,12 +1,12 @@
 import json
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 
 
 def get_timestamp() -> str:
     """获取当前UTC时间戳"""
-    return datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+    return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
 
 
 def load_config(config_path: str = "config.json") -> Dict[str, Any]:

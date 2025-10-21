@@ -59,6 +59,331 @@
             height: calc(100vh - 60px);
             overflow: hidden;
             background-color: #34495e;
+            transition: margin-left 0.3s ease;
+        }
+        
+        .canvas-container.sidebar-open {
+            margin-left: 300px;
+        }
+        
+        .sidebar {
+            position: fixed;
+            left: -400px;
+            top: 0;
+            width: 260px;
+            height: 100vh;
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+            transition: left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            z-index: 1000;
+            overflow-y: auto;
+            border: none;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar.open {
+            left: 0;
+        }
+        
+        .sidebar-header {
+            padding: 0 0 20px 0;
+            border-bottom: 1px solid #34495e;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-shrink: 0;
+        }
+        
+        .sidebar-title {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .sidebar-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+        }
+        
+        .sidebar-content {
+            width: 260px;
+            padding: 0;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        
+        .robot-form {
+            margin-bottom: 20px;
+            flex-shrink: 0;
+        }
+        
+        .robot-list {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        
+        .robot-list h3 {
+            margin: 0 0 15px 0;
+            color: #ecf0f1;
+            flex-shrink: 0;
+        }
+        
+        #robotListContainer {
+            flex: 1;
+            overflow-y: auto;
+            /* 隐藏滚动条但保持滚动功能 */
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE and Edge */
+        }
+        
+        /* 隐藏 WebKit 浏览器的滚动条 */
+        #robotListContainer::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #ecf0f1;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #34495e;
+            border-radius: 4px;
+            background-color: #34495e;
+            color: white;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .form-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #34495e;
+            border-radius: 4px;
+            background-color: #34495e;
+            color: white;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        
+        .btn-primary {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            width: 100%;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2980b9;
+        }
+        
+        .btn-config {
+            background-color: #95a5a6;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            width: 25%;
+            margin-left: 5%;
+            display: inline-block;
+        }
+        
+        .btn-config:hover {
+            background-color: #7f8c8d;
+        }
+        
+        .button-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .robot-list {
+            margin-top: 20px;
+        }
+        
+        .robot-item {
+            background-color: #34495e;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #3498db;
+            position: relative;
+        }
+        
+        .robot-item:hover {
+            background-color: #3d566e;
+        }
+        
+        .robot-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .robot-name {
+            font-weight: bold;
+            font-size: 16px;
+            color: #ecf0f1;
+        }
+        
+        .btn-config-small {
+            background-color: #f39c12;
+            color: white;
+        }
+        
+        .btn-config-small:hover {
+            background-color: #e67e22;
+        }
+        
+        .robot-info {
+            font-size: 12px;
+            color: #bdc3c7;
+        }
+        
+        .robot-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 12px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .btn-danger {
+            background-color: #e74c3c;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        
+        .sidebar-toggle {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 15px 8px;
+            border-radius: 0 8px 8px 0;
+            cursor: pointer;
+            font-size: 14px;
+            z-index: 1001;
+            transition: all 0.3s ease;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.2);
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .sidebar-toggle:hover {
+            background: linear-gradient(135deg, #2980b9, #1f5f8b);
+            transform: translateY(-50%) translateX(3px);
+            box-shadow: 3px 0 12px rgba(0,0,0,0.3);
+        }
+        
+        .sidebar-toggle.open {
+            left: 300px;
+            border-radius: 0 8px 8px 0 ;
+            padding: 15px 8px;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* 配置模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: #2c3e50;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 400px;
+            max-width: 90%;
+            color: white;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #34495e;
+            padding-bottom: 10px;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+        }
+        
+        .modal-close:hover {
+            color: #e74c3c;
         }
         
         #mapCanvas {
@@ -72,8 +397,8 @@
         }
         
         .info-panel {
-            position: absolute;
-            top: 10px;
+            position: fixed;
+            top: 70px;
             right: 10px;
             background-color: rgba(52, 73, 94, 0.9);
             color: white;
@@ -82,6 +407,7 @@
             font-size: 12px;
             min-width: 200px;
             backdrop-filter: blur(5px);
+            z-index: 999;
         }
         
         .info-item {
@@ -132,9 +458,83 @@
             <button class="btn" onclick="toggleGrid()">网格</button>
             <div class="status" id="status">准备就绪</div>
         </div>
+        
+        <!-- 配置模态框 -->
+        <div id="configModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-title">机器人高级配置</div>
+                    <button class="modal-close" onclick="closeConfigModal()">&times;</button>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">电量 (%)</label>
+                    <input type="number" class="form-input" id="configBattery" value="100" min="0" max="100">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">最大速度 (m/s)</label>
+                    <input type="number" class="form-input" id="configMaxSpeed" value="2.0" step="0.1" min="0.1" max="10.0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">朝向 (弧度)</label>
+                    <input type="number" class="form-input" id="configOrientation" value="0" step="0.1" min="-6.28" max="6.28">
+                </div>
+                <button class="btn-primary" onclick="saveConfig()">保存配置</button>
+            </div>
+        </div>
     </div>
     
-    <div class="canvas-container">
+    <!-- 侧边栏切换按钮 -->
+    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">
+        打开
+    </button>
+    
+    <!-- 侧边栏 -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">仿真机器人管理</div>
+            <button class="sidebar-close" onclick="toggleSidebar()">×</button>
+        </div>
+        <div class="sidebar-content">
+            <div class="robot-form">
+                <h3 style="margin-top: 0; color: #ecf0f1;">注册新机器人</h3>
+                <div class="form-group">
+                    <label class="form-label">机器人名称</label>
+                    <input type="text" class="form-input" id="robotName" placeholder="输入机器人名称">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">机器人类型</label>
+                    <select class="form-select" id="robotType">
+                        <option value="AGV">AGV</option>
+                        <option value="AMR">AMR</option>
+                        <option value="Forklift">叉车</option>
+                        <option value="Conveyor">输送机器人</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">机器人IP地址</label>
+                    <input type="text" class="form-input" id="robotIP" placeholder="192.168.1.100">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">初始位置</label>
+                    <select class="form-select" id="initialPosition">
+                        <option value="">选择初始位置</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button class="btn-primary" onclick="registerRobot()">注册机器人</button>
+                </div>
+            </div>
+            
+            <div class="robot-list">
+                <h3>已注册机器人</h3>
+                <div id="robotListContainer">
+                    <!-- 机器人列表将在这里动态生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="canvas-container" id="canvasContainer">
         <canvas id="mapCanvas"></canvas>
         <div class="loading" id="loading" style="display: none;">正在加载地图数据...</div>
         
@@ -178,16 +578,115 @@
         };
         let isDragging = false;
         let lastMousePos = { x: 0, y: 0 };
-        let showGrid = true;
+        let showGrid = true;// 全局变量
+        let sidebarOpen = false;
+        let registeredRobots = [];
+        let robotConfig = {
+            battery: 100,
+            maxSpeed: 2.0,
+            orientation: 0
+        };
         
         // API配置
-        const API_BASE_URL = 'http://localhost:8001/api';
+        const API_BASE_URL = 'http://127.0.0.1:8001/api';
         
+        // 日志记录函数
+        function logRequest(method, url, requestData = null, startTime = null) {
+            const timestamp = new Date().toISOString();
+            const logMessage = `[${timestamp}] [FRONTEND] ${method} ${url}`;
+            
+            if (requestData) {
+                console.log(`${logMessage} - Request:`, requestData);
+            } else {
+                console.log(logMessage);
+            }
+            
+            // 发送日志到后端（异步，不阻塞主要请求）
+            sendLogToBackend('INFO', `Frontend ${method} request to ${url}`, requestData);
+        }
+        
+        function logResponse(method, url, response, responseData = null, startTime = null) {
+            const timestamp = new Date().toISOString();
+            const duration = startTime ? Date.now() - startTime : 0;
+            const logMessage = `[${timestamp}] [FRONTEND] ${method} ${url} - Response: ${response.status} ${response.statusText} (${duration}ms)`;
+            
+            console.log(logMessage, responseData);
+            
+            // 发送日志到后端
+            sendLogToBackend('INFO', `Frontend ${method} response from ${url}: ${response.status} (${duration}ms)`, responseData);
+        }
+        
+        function logError(method, url, error, startTime = null) {
+            const timestamp = new Date().toISOString();
+            const duration = startTime ? Date.now() - startTime : 0;
+            const logMessage = `[${timestamp}] [FRONTEND] ${method} ${url} - Error: ${error.message} (${duration}ms)`;
+            
+            console.error(logMessage, error);
+            
+            // 发送错误日志到后端
+            sendLogToBackend('ERROR', `Frontend ${method} error for ${url}: ${error.message} (${duration}ms)`, { error: error.message, stack: error.stack });
+        }
+        
+        // 发送日志到后端的函数
+        async function sendLogToBackend(level, message, data = null) {
+            try {
+                // 使用原生fetch避免循环调用
+                await fetch(`${API_BASE_URL}/logs`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        level: level,
+                        message: message,
+                        data: data,
+                        timestamp: new Date().toISOString(),
+                        source: 'frontend'
+                    })
+                });
+            } catch (error) {
+                // 静默处理日志发送失败，避免影响主要功能
+                console.warn('Failed to send log to backend:', error.message);
+            }
+        }
+        
+        // 封装的fetch函数，自动添加日志记录
+        async function loggedFetch(url, options = {}) {
+            const method = options.method || 'GET';
+            const startTime = Date.now();
+            
+            // 记录请求日志
+            logRequest(method, url, options.body ? JSON.parse(options.body) : null, startTime);
+            
+            try {
+                const response = await fetch(url, options);
+                
+                // 记录响应日志
+                let responseData = null;
+                if (response.headers.get('content-type')?.includes('application/json')) {
+                    try {
+                        responseData = await response.clone().json();
+                    } catch (e) {
+                        // 忽略JSON解析错误
+                    }
+                }
+                
+                logResponse(method, url, response, responseData, startTime);
+                
+                return response;
+            } catch (error) {
+                // 记录错误日志
+                logError(method, url, error, startTime);
+                throw error;
+            }
+        }
+
         // 初始化
-        window.onload = function() {
+        window.onload = async function() {
             initCanvas();
             loadMapData();
             setupEventListeners();
+            await loadRobotList(); // 从后端加载机器人列表
         };
         
         function initCanvas() {
@@ -285,14 +784,14 @@
         function screenToWorld(screenX, screenY) {
             return {
                 x: (screenX - viewTransform.x) / viewTransform.scale / 20, // 除以20来反向转换
-                y: (screenY - viewTransform.y) / viewTransform.scale / 20  // 除以20来反向转换
+                y: -((screenY - viewTransform.y) / viewTransform.scale / 20) // 垂直翻转：添加负号
             };
         }
         
         function worldToScreen(worldX, worldY) {
             return {
                 x: (worldX * 20) * viewTransform.scale + viewTransform.x, // 乘以20放大坐标
-                y: (worldY * 20) * viewTransform.scale + viewTransform.y  // 乘以20放大坐标
+                y: (-worldY * 20) * viewTransform.scale + viewTransform.y // 垂直翻转：添加负号
             };
         }
         
@@ -300,9 +799,9 @@
         async function loadMapData() {
             try {
                 document.getElementById('loading').style.display = 'block';
-                document.getElementById('status').textContent = '正在加载...';
+                document.getElementById('status').textContent = '正在加载地图数据...';
                 
-                const response = await fetch(`${API_BASE_URL}/scene/data`);
+                const response = await loggedFetch(`${API_BASE_URL}/scene/data`);
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
@@ -315,10 +814,17 @@
                 drawMap();
                 
                 document.getElementById('status').textContent = '地图加载完成';
+                document.getElementById('loading').style.display = 'none';
+                
+                // 异步加载机器人数据，不阻塞地图加载完成提示
+                loadRobotList().catch(error => {
+                    console.error('加载机器人列表失败:', error);
+                    document.getElementById('status').textContent = '地图加载完成，机器人列表加载失败';
+                });
+                
             } catch (error) {
                 console.error('加载地图数据失败:', error);
                 document.getElementById('status').textContent = '加载失败: ' + error.message;
-            } finally {
                 document.getElementById('loading').style.display = 'none';
             }
         }
@@ -331,6 +837,25 @@
             
             document.getElementById('pointCount').textContent = pointCount;
             document.getElementById('routeCount').textContent = routeCount;
+            
+            // 更新初始位置选择器
+            updateInitialPositionOptions();
+        }
+        
+        function updateInitialPositionOptions() {
+            const select = document.getElementById('initialPosition');
+            select.innerHTML = '<option value="">选择初始位置</option>';
+            
+            if (mapData && mapData.points) {
+                mapData.points.forEach(point => {
+                    if (point.name) {
+                        const option = document.createElement('option');
+                        option.value = point.id;
+                        option.textContent = `${point.name} (${point.x.toFixed(2)}, ${point.y.toFixed(2)})`;
+                        select.appendChild(option);
+                    }
+                });
+            }
         }
         
         function fitMapToView() {
@@ -569,6 +1094,358 @@
         function toggleGrid() {
             showGrid = !showGrid;
             drawMap();
+        }
+        
+        // 侧边栏控制函数
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('sidebarToggle');
+            const canvasContainer = document.getElementById('canvasContainer');
+            
+            sidebarOpen = !sidebarOpen;
+            
+            if (sidebarOpen) {
+                sidebar.classList.add('open');
+                canvasContainer.classList.add('sidebar-open');
+                toggleBtn.classList.add('open');
+                toggleBtn.textContent = '收起';
+            } else {
+                sidebar.classList.remove('open');
+                canvasContainer.classList.remove('sidebar-open');
+                toggleBtn.classList.remove('open');
+                toggleBtn.textContent = '打开';
+            }
+            
+            // 重新调整画布大小
+            setTimeout(() => {
+                resizeCanvas();
+            }, 300);
+        }
+        
+        // 机器人配置相关函数
+        let currentConfigRobotId = null;
+        
+        function openRobotConfig(robotId) {
+            currentConfigRobotId = robotId;
+            const robot = registeredRobots.find(r => r.id === robotId);
+            
+            if (robot) {
+                document.getElementById('configBattery').value = robot.battery;
+                document.getElementById('configMaxSpeed').value = robot.maxSpeed;
+                document.getElementById('configOrientation').value = robot.orientation;
+                document.getElementById('configModal').style.display = 'block';
+            }
+        }
+        
+        function saveConfig() {
+            if (currentConfigRobotId) {
+                const robot = registeredRobots.find(r => r.id === currentConfigRobotId);
+                if (robot) {
+                    // 更新本地数据
+                    robot.battery = parseFloat(document.getElementById('configBattery').value);
+                    robot.maxSpeed = parseFloat(document.getElementById('configMaxSpeed').value);
+                    robot.orientation = parseFloat(document.getElementById('configOrientation').value);
+                    
+                    // 同步到后端
+                    updateRobotOnServer(currentConfigRobotId, {
+                        battery: robot.battery,
+                        maxSpeed: robot.maxSpeed,
+                        config: {
+                            ...robot.config,
+                            orientation: robot.orientation
+                        }
+                    });
+                    
+                    updateRobotList();
+                    closeConfigModal();
+                }
+            } else {
+                // 全局配置保存
+                robotConfig.battery = parseFloat(document.getElementById('configBattery').value);
+                robotConfig.maxSpeed = parseFloat(document.getElementById('configMaxSpeed').value);
+                robotConfig.orientation = parseFloat(document.getElementById('configOrientation').value);
+                closeConfigModal();
+                alert('默认配置已保存！');
+            }
+        }
+        
+        // 更新机器人配置到服务器
+        async function updateRobotOnServer(robotId, updateData) {
+            try {
+                const response = await loggedFetch(`${API_BASE_URL}/robots/${robotId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updateData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('机器人配置已更新并同步到服务器！');
+                    document.getElementById('status').textContent = '配置更新成功';
+                    setTimeout(() => {
+                        document.getElementById('status').textContent = '准备就绪';
+                    }, 2000);
+                } else {
+                    throw new Error(result.message || '更新失败');
+                }
+                
+            } catch (error) {
+                console.error('更新机器人配置失败:', error);
+                alert('更新机器人配置失败: ' + error.message);
+                document.getElementById('status').textContent = '配置更新失败: ' + error.message;
+            }
+        }
+        
+        // 配置模态框相关函数
+        function openConfigModal() {
+            document.getElementById('configModal').style.display = 'block';
+        }
+        
+        function closeConfigModal() {
+            document.getElementById('configModal').style.display = 'none';
+            currentConfigRobotId = null; // 重置当前配置的机器人ID
+        }
+        
+
+        
+        // 点击模态框外部关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('configModal');
+            if (event.target === modal) {
+                closeConfigModal();
+            }
+        }
+        
+        // 机器人管理函数
+        async function registerRobot() {
+            const robotName = document.getElementById('robotName').value.trim();
+            const robotType = document.getElementById('robotType').value;
+            const robotIP = document.getElementById('robotIP').value.trim();
+            const initialPosition = document.getElementById('initialPosition').value;
+            
+            // 验证输入
+            if (!robotName) {
+                alert('请输入机器人名称');
+                return;
+            }
+            
+            if (!robotIP) {
+                alert('请输入机器人IP地址');
+                return;
+            }
+            
+            if (!initialPosition) {
+                alert('请选择初始位置');
+                return;
+            }
+            
+            // 验证IP地址格式
+            const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+            if (!ipRegex.test(robotIP)) {
+                alert('请输入有效的IP地址格式');
+                return;
+            }
+            
+            // 检查名称是否已存在
+            if (registeredRobots.find(robot => robot.name === robotName)) {
+                alert('机器人名称已存在，请使用不同的名称');
+                return;
+            }
+            
+            // 检查IP是否已存在
+            if (registeredRobots.find(robot => robot.ip === robotIP)) {
+                alert('该IP地址已被使用，请使用不同的IP');
+                return;
+            }
+            
+            // 获取初始位置信息
+            let initialPos = null;
+            if (initialPosition && mapData && mapData.points) {
+                initialPos = mapData.points.find(point => point.id === initialPosition);
+            }
+            
+            // 创建机器人数据
+            const robotData = {
+                name: robotName,
+                type: robotType,
+                ip: robotIP,
+                battery: robotConfig.battery,
+                maxSpeed: robotConfig.maxSpeed,
+                orientation: robotConfig.orientation,
+                position: initialPos ? { x: initialPos.x, y: initialPos.y, rotate: robotConfig.orientation } : { x: 0, y: 0, rotate: 0 },
+                config: {
+                    battery: robotConfig.battery,
+                    maxSpeed: robotConfig.maxSpeed,
+                    orientation: robotConfig.orientation
+                },
+                properties: {
+                    initialPosition: initialPos,
+                    registeredAt: new Date().toISOString()
+                }
+            };
+            
+            try {
+                // 发送POST请求到后端API
+                const response = await loggedFetch(`${API_BASE_URL}/robots`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    },
+                    body: JSON.stringify(robotData),
+                    mode: 'cors',
+                    credentials: 'omit'
+                });
+                
+                // 检查响应状态
+                if (!response.ok) {
+                    let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.message || errorMessage;
+                    } catch (parseError) {
+                        console.warn('无法解析错误响应:', parseError);
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                // 解析响应数据
+                const result = await response.json();
+                console.log('注册响应:', result);
+                
+                if (result.success) {
+                    // 注册成功，重新加载机器人列表
+                    await loadRobotList();
+                    
+                    // 清空表单
+                    clearRobotForm();
+                    
+                    // 显示成功消息
+                    document.getElementById('status').textContent = `机器人 ${robotName} 注册成功`;
+                    setTimeout(() => {
+                        document.getElementById('status').textContent = '准备就绪';
+                    }, 3000);
+                } else {
+                    throw new Error(result.message || '注册失败');
+                }
+                
+            } catch (error) {
+                console.error('注册机器人失败:', error);
+                
+                // 更详细的错误处理
+                let errorMessage = error.message;
+                if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                    errorMessage = '无法连接到服务器，请检查服务器是否正在运行';
+                } else if (error.name === 'SyntaxError') {
+                    errorMessage = '服务器响应格式错误';
+                }
+                
+                alert('注册机器人失败: ' + errorMessage);
+                document.getElementById('status').textContent = '注册失败: ' + errorMessage;
+            }
+        }
+        
+        async function loadRobotList() {
+            try {
+                const response = await loggedFetch(`${API_BASE_URL}/robots`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const robotsData = await response.json();
+                
+                // 转换后端数据格式为前端格式
+                registeredRobots = robotsData.map(robot => ({
+                    id: robot.id,
+                    name: robot.name,
+                    type: robot.type,
+                    ip: robot.ip,
+                    battery: robot.battery,
+                    maxSpeed: robot.maxSpeed,
+                    orientation: robot.config?.orientation || 0,
+                    status: robot.status,
+                    currentPosition: robot.position,
+                    registeredAt: robot.properties?.registeredAt ? 
+                        new Date(robot.properties.registeredAt).toLocaleString() : 
+                        '未知',
+                    initialPosition: robot.properties?.initialPosition || null
+                }));
+                
+                updateRobotList();
+                
+            } catch (error) {
+                console.error('加载机器人列表失败:', error);
+                document.getElementById('status').textContent = '加载机器人列表失败: ' + error.message;
+            }
+        }
+        
+        function clearRobotForm() {
+            document.getElementById('robotName').value = '';
+            document.getElementById('robotType').value = 'AGV';
+            document.getElementById('robotIP').value = '';
+            document.getElementById('initialPosition').value = '';
+        }
+        
+        function updateRobotList() {
+            const container = document.getElementById('robotListContainer');
+            
+            if (registeredRobots.length === 0) {
+                container.innerHTML = '<p style="color: #bdc3c7; font-style: italic;">暂无注册的机器人</p>';
+                return;
+            }
+            
+            container.innerHTML = registeredRobots.map(robot => `
+                <div class="robot-item">
+                    <div class="robot-header">
+                        <div class="robot-name">${robot.name}</div>
+                        <button class="btn-small btn-config-small" onclick="openRobotConfig('${robot.id}')" title="配置">⚙️</button>
+                    </div>
+                    <div class="robot-info">
+                        类型: ${robot.type} | IP: ${robot.ip}<br>
+                        电量: ${robot.battery}% | 最大速度: ${robot.maxSpeed} m/s<br>
+                        ${robot.initialPosition ? 
+                            `初始位置: ${robot.initialPosition.name} (${robot.initialPosition.x.toFixed(2)}, ${robot.initialPosition.y.toFixed(2)})` : 
+                            '无初始位置'}<br>
+                        状态: ${robot.status} | 注册时间: ${robot.registeredAt}
+                    </div>
+                    <div class="robot-actions">
+                        <button class="btn-small btn-danger" onclick="removeRobot('${robot.id}')">删除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        async function removeRobot(robotId) {
+            if (confirm('确定要删除这个机器人吗？')) {
+                try {
+                    const response = await loggedFetch(`${API_BASE_URL}/robots/${robotId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    // 重新加载机器人列表
+                    await loadRobotList();
+                    
+                    document.getElementById('status').textContent = '机器人已删除';
+                    setTimeout(() => {
+                        document.getElementById('status').textContent = '准备就绪';
+                    }, 2000);
+                    
+                } catch (error) {
+                    console.error('删除机器人失败:', error);
+                    alert('删除机器人失败: ' + error.message);
+                }
+            }
         }
     </script>
 </body>

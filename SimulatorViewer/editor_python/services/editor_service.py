@@ -14,10 +14,13 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
 from models.scene_models import SceneData, StandardScene
+from models.robot_models import RobotInfo, RobotStatus, RobotType, RobotGroup
+from models.map_models import MapPointInfo, MapPointType
 from services.robot_service import RobotService
 from services.point_service import PointService
 from services.route_service import RouteService
 from services.area_service import AreaService
+from logger_config import logger
 
 
 class EditorService:
@@ -125,13 +128,28 @@ class EditorService:
             if scene_data.robots:
                 for robot_data in scene_data.robots:
                     if isinstance(robot_data, dict):
+                        # 处理机器人类型
+                        robot_type = None
+                        if robot_data.get('type'):
+                            try:
+                                if isinstance(robot_data['type'], int):
+                                    # 如果是整数，尝试转换为枚举
+                                    robot_type = RobotType(robot_data['type'])
+                                elif isinstance(robot_data['type'], str):
+                                    # 如果是字符串，尝试按名称获取
+                                    robot_type = RobotType[robot_data['type']]
+                                else:
+                                    robot_type = robot_data['type']
+                            except (KeyError, ValueError):
+                                robot_type = RobotType.TYPE_1  # 默认类型
+                        
                         # 确保必需字段存在
                         robot_dict = {
                             'id': robot_data.get('id', ''),
                             'label': robot_data.get('label', ''),
                             'gid': robot_data.get('gid', ''),
                             'brand': robot_data.get('brand'),
-                            'type': robot_data.get('type'),
+                            'type': robot_type,
                             'ip': robot_data.get('ip', ''),
                             'status': RobotStatus.OFFLINE,  # 默认状态
                             'position': robot_data.get('position'),
@@ -171,9 +189,7 @@ class EditorService:
             return True
             
         except Exception as e:
-            print(f"加载场景数据失败: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"加载场景数据失败: {e}")
             return False
     
     def load_scene_from_file(self, file_path: str) -> bool:
@@ -193,7 +209,7 @@ class EditorService:
             return self.load_scene_data(scene_data)
             
         except Exception as e:
-            print(f"从文件加载场景失败: {e}")
+            logger.error(f"从文件加载场景失败: {e}")
             return False
     
     def save_scene_to_file(self, file_path: str) -> bool:
@@ -211,7 +227,7 @@ class EditorService:
             return True
             
         except Exception as e:
-            print(f"保存场景到文件失败: {e}")
+            logger.error(f"保存场景到文件失败: {e}")
             return False
     
     def get_current_scene_data(self) -> Optional[SceneData]:
@@ -336,7 +352,7 @@ class EditorService:
             else:
                 raise ValueError(f"不支持的导入格式: {format_type}")
         except Exception as e:
-            print(f"导入数据失败: {e}")
+            logger.error(f"导入数据失败: {e}")
             return False
     
     def clear_all_data(self) -> None:
