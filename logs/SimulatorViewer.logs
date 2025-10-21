@@ -161,3 +161,14 @@
 2025-10-21 17:52:39 - SimulatorViewer - INFO - web_api.py:964 - [2025-10-21T09:52:39.359Z] [FRONTEND] Frontend PUT response from http://127.0.0.1:8001/api/robots/64726678-e076-41a5-a679-75c7800f5052: 200 (26ms)
 2025-10-21 17:52:39 - SimulatorViewer - INFO - web_api.py:966 - [FRONTEND] 数据详情: {'success': True, 'message': '机器人信息更新成功'}
 2025-10-21 17:52:39 - SimulatorViewer - INFO - web_api.py:127 - [API] POST请求处理完成，耗时: 1.52ms
+2025-10-21 18:18:19 - SimulatorViewer - INFO - main.py:42 - 正在启动地图编辑器API服务器...
+2025-10-21 18:18:19 - SimulatorViewer - INFO - main.py:43 - 主机: 0.0.0.0
+2025-10-21 18:18:19 - SimulatorViewer - INFO - main.py:44 - 端口: 8001
+2025-10-21 18:18:20 - SimulatorViewer - INFO - main.py:51 - 正在加载场景文件: D:\CodeProject\SimulationAGV\SimulatorAGV\map_flie\testmap.scene
+2025-10-21 18:18:20 - SimulatorViewer - INFO - main.py:54 - 场景文件加载成功
+2025-10-21 18:18:20 - SimulatorViewer - INFO - main.py:62 - 
+服务器已启动!
+2025-10-21 18:18:20 - SimulatorViewer - INFO - main.py:63 - API基础URL: http://0.0.0.0:8001/api
+2025-10-21 18:18:20 - SimulatorViewer - INFO - main.py:64 - 状态: 运行中
+2025-10-21 18:18:36 - SimulatorViewer - INFO - main.py:21 - 
+正在关闭服务器...
