@@ -5,6 +5,7 @@ import sys
 import os
 import json
 import uuid
+import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from typing import Dict, Any, Optional
@@ -503,20 +504,19 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
             for robot in robots:
                 robot_dict = {
                     "id": robot.id,
-                    "name": robot.label,
+                    "serialNumber": robot.label,
+                    "manufacturer": robot.brand or "",
                     "type": robot.type.name if robot.type else "TYPE_1",
                     "ip": robot.ip,
                     "status": robot.status.value if robot.status else "offline",
                     "position": robot.position or {"x": 0, "y": 0, "rotate": 0},
                     "battery": robot.battery or 100.0,
                     "maxSpeed": robot.speed or 2.0,
-                    "brand": robot.brand or "",
                     "gid": robot.gid or "default",
                     "is_warning": robot.is_warning,
                     "is_fault": robot.is_fault,
                     "last_update": robot.last_update,
-                    "config": robot.config or {},
-                    "properties": robot.properties or {}
+                    "config": robot.config or {}
                 }
                 robots_data.append(robot_dict)
             
@@ -546,20 +546,19 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
             for robot in robots:
                 robot_dict = {
                     "id": robot.id,
-                    "name": robot.label,
+                    "serialNumber": robot.label,
+                    "manufacturer": robot.brand or "",
                     "type": robot.type.name if robot.type else "TYPE_1",
                     "ip": robot.ip,
                     "status": robot.status.value if robot.status else "offline",
                     "position": robot.position or {"x": 0, "y": 0, "rotate": 0},
                     "battery": robot.battery or 100.0,
                     "maxSpeed": robot.speed or 2.0,
-                    "brand": robot.brand or "",
                     "gid": robot.gid or "default",
                     "is_warning": robot.is_warning,
                     "is_fault": robot.is_fault,
                     "last_update": robot.last_update,
-                    "config": robot.config or {},
-                    "properties": robot.properties or {}
+                    "config": robot.config or {}
                 }
                 robots_data.append(robot_dict)
             
@@ -597,12 +596,12 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
                 # 加载机器人数据
                 for robot_data in robots_data:
                     try:
-                        robot_type = RobotType.TYPE_1
+                        robot_type = RobotType.AGV
                         if robot_data.get('type'):
                             try:
-                                robot_type = RobotType[robot_data['type']]
-                            except KeyError:
-                                robot_type = RobotType.TYPE_1
+                                robot_type = RobotType(robot_data['type'])
+                            except (KeyError, ValueError):
+                                robot_type = RobotType.AGV
                         
                         robot_status = RobotStatus.OFFLINE
                         if robot_data.get('status'):
@@ -613,9 +612,9 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
                         
                         robot_info = RobotInfo(
                             id=robot_data['id'],
-                            label=robot_data['name'],
+                            label=robot_data['serialNumber'],
                             gid=robot_data.get('gid', 'default'),
-                            brand=robot_data.get('brand', ''),
+                            brand=robot_data.get('manufacturer', ''),
                             type=robot_type,
                             ip=robot_data['ip'],
                             status=robot_status,
@@ -655,14 +654,14 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
                 return
             
             # 2. 验证必需字段
-            required_fields = ['name', 'type', 'ip']
+            required_fields = ['serialNumber', 'type', 'ip']
             missing_fields = [field for field in required_fields if field not in data]
             if missing_fields:
                 self._send_error(400, f"缺少必需字段: {', '.join(missing_fields)}")
                 return
             
             # 3. 基础字段验证
-            robot_name = str(data['name']).strip()
+            robot_name = str(data['serialNumber']).strip()
             robot_ip = str(data['ip']).strip()
             
             if not robot_name:
@@ -683,14 +682,22 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
                     self._send_error(409, f"IP地址 '{robot_ip}' 已被使用")
                     return
             
-            # 5. 创建机器人
+            # 处理机器人类型
+            robot_type = RobotType.AGV  # 默认类型
+            if data.get('type'):
+                try:
+                    robot_type = RobotType(data['type'])
+                except (KeyError, ValueError):
+                    robot_type = RobotType.AGV
+            
+            # 5. 创建机器人 - 按照标准JSON格式
             robot_id = str(uuid.uuid4())
             robot_info = RobotInfo(
                 id=robot_id,
                 label=robot_name,
                 gid=data.get('gid', "default"),
-                brand=data.get('brand', ''),
-                type=RobotType.TYPE_1,
+                brand=data.get('manufacturer', 'SEER'),
+                type=robot_type,
                 ip=robot_ip,
                 status=RobotStatus.OFFLINE,
                 position=data.get('position', {"x": 0, "y": 0, "rotate": 0}),
@@ -698,9 +705,9 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
                 speed=float(data.get('maxSpeed', 2.0)),
                 is_warning=data.get('is_warning', False),
                 is_fault=data.get('is_fault', False),
-                last_update=None,
+
                 config=data.get('config', {}),
-                properties=data.get('properties', {})
+                properties={}
             )
             
             # 6. 保存机器人
@@ -714,7 +721,7 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
                 "message": "Robot registered successfully",
                 "robot_info": {
                     "id": robot_id,
-                    "name": robot_name,
+                    "serialNumber": robot_name,
                     "ip": robot_ip,
                     "type": data['type'],
                     "status": "offline"
@@ -791,14 +798,14 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
             updated_fields = []
             
             # 更新基本信息
-            if 'name' in data and data['name'] != robot.label:
+            if 'serialNumber' in data and data['serialNumber'] != robot.label:
                 # 检查名称唯一性
                 for existing_id, existing_robot in self.editor_service.robot_service.robots.items():
-                    if existing_id != robot_id and existing_robot.label == data['name']:
-                        self._send_error(409, f"机器人名称 '{data['name']}' 已存在")
+                    if existing_id != robot_id and existing_robot.label == data['serialNumber']:
+                        self._send_error(409, f"机器人名称 '{data['serialNumber']}' 已存在")
                         return
-                robot.label = data['name']
-                updated_fields.append('name')
+                robot.label = data['serialNumber']
+                updated_fields.append('serialNumber')
             
             if 'ip' in data and data['ip'] != robot.ip:
                 # 检查IP唯一性
@@ -813,9 +820,16 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
                 robot.gid = data['gid']
                 updated_fields.append('gid')
             
-            if 'brand' in data:
-                robot.brand = data['brand']
-                updated_fields.append('brand')
+            if 'manufacturer' in data:
+                robot.brand = data['manufacturer']
+                updated_fields.append('manufacturer')
+            
+            # 处理manufacturer和version属性（已经在上面处理了manufacturer）
+            if 'version' in data:
+                if not robot.properties:
+                    robot.properties = {}
+                robot.properties['version'] = data['version']
+                updated_fields.append('version')
             
             if 'maxSpeed' in data:
                 robot.speed = float(data['maxSpeed'])
@@ -859,22 +873,21 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
                 "robot_id": robot_id,
                 "updated_fields": updated_fields,
                 "robot_info": {
-                    "id": robot.id,
-                    "name": robot.label,
-                    "type": robot.type.name if robot.type else "TYPE_1",
-                    "ip": robot.ip,
-                    "status": robot.status.value if robot.status else "offline",
-                    "position": robot.position,
-                    "battery": robot.battery,
-                    "maxSpeed": robot.speed,
-                    "brand": robot.brand,
-                    "gid": robot.gid,
-                    "is_warning": robot.is_warning,
-                    "is_fault": robot.is_fault,
-                    "last_update": robot.last_update,
-                    "config": robot.config,
-                    "properties": robot.properties
-                }
+                        "id": robot.id,
+                        "serialNumber": robot.label,
+                        "manufacturer": robot.brand,
+                        "type": robot.type.name if robot.type else "TYPE_1",
+                        "ip": robot.ip,
+                        "status": robot.status.value if robot.status else "offline",
+                        "position": robot.position,
+                        "battery": robot.battery,
+                        "maxSpeed": robot.speed,
+                        "gid": robot.gid,
+                        "is_warning": robot.is_warning,
+                        "is_fault": robot.is_fault,
+                        "last_update": robot.last_update,
+                        "config": robot.config
+                    }
             }
             
             logger.info(f"机器人配置更新成功: {robot_id}, 更新字段: {updated_fields}")
@@ -893,6 +906,9 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
     def _handle_update_robot(self, robot_id: str, data: Dict[str, Any]):
         """更新机器人信息"""
         try:
+            logger.info(f"开始处理机器人更新请求: {robot_id}")
+            logger.info(f"接收到的数据: {data}")
+            
             # 先从文件加载最新数据
             self._load_robots_from_file()
             
@@ -901,14 +917,107 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
                 self._send_error(404, f"机器人 {robot_id} 不存在")
                 return
             
-            # 更新机器人信息
-            success = self.editor_service.robot_service.update_robot(robot_id, data)
-            if success:
-                # 保存到文件
-                self._save_robots_to_file()
-                self._send_json_response({"success": True, "message": "机器人信息更新成功"})
-            else:
-                self._send_error(400, "更新机器人信息失败")
+            # 获取当前机器人信息
+            robot = self.editor_service.robot_service.robots[robot_id]
+            logger.info(f"找到机器人: {robot.label}")
+            
+            # 验证和更新字段
+            updated_fields = []
+            
+            # 更新基本信息 - 字段映射
+            if 'serialNumber' in data and data['serialNumber'] != robot.label:
+                # 检查名称唯一性
+                for existing_id, existing_robot in self.editor_service.robot_service.robots.items():
+                    if existing_id != robot_id and existing_robot.label == data['serialNumber']:
+                        self._send_error(409, f"机器人名称 '{data['serialNumber']}' 已存在")
+                        return
+                robot.label = data['serialNumber']
+                updated_fields.append('serialNumber')
+            
+            if 'ip' in data and data['ip'] != robot.ip:
+                # 检查IP唯一性
+                for existing_id, existing_robot in self.editor_service.robot_service.robots.items():
+                    if existing_id != robot_id and existing_robot.ip == data['ip']:
+                        self._send_error(409, f"IP地址 '{data['ip']}' 已被使用")
+                        return
+                robot.ip = data['ip']
+                updated_fields.append('ip')
+            
+            if 'type' in data:
+                # 确保type是RobotType枚举对象
+                from models.robot_models import RobotType
+                if isinstance(data['type'], str):
+                    try:
+                        robot.type = RobotType(data['type'])
+                    except (KeyError, ValueError):
+                        robot.type = RobotType.AGV  # 默认类型
+                elif isinstance(data['type'], RobotType):
+                    robot.type = data['type']
+                else:
+                    robot.type = RobotType.AGV  # 默认类型
+                updated_fields.append('type')
+            
+            if 'gid' in data:
+                robot.gid = data['gid']
+                updated_fields.append('gid')
+            
+            if 'manufacturer' in data:
+                robot.brand = data['manufacturer']
+                updated_fields.append('manufacturer')
+            
+            if 'maxSpeed' in data:
+                robot.speed = float(data['maxSpeed'])
+                updated_fields.append('maxSpeed')
+            
+            if 'battery' in data:
+                robot.battery = float(data['battery'])
+                updated_fields.append('battery')
+            
+            if 'position' in data:
+                robot.position = data['position']
+                updated_fields.append('position')
+            
+            if 'orientation' in data:
+                # 将orientation存储到config中
+                if not robot.config:
+                    robot.config = {}
+                robot.config['orientation'] = data['orientation']
+                updated_fields.append('orientation')
+            
+            if 'initialPosition' in data:
+                # 将initialPosition存储到config中
+                if not robot.config:
+                    robot.config = {}
+                robot.config['initialPosition'] = data['initialPosition']
+                updated_fields.append('initialPosition')
+            
+            if 'is_warning' in data:
+                robot.is_warning = bool(data['is_warning'])
+                updated_fields.append('is_warning')
+            
+            if 'is_fault' in data:
+                robot.is_fault = bool(data['is_fault'])
+                updated_fields.append('is_fault')
+            
+            if 'config' in data:
+                if not robot.config:
+                    robot.config = {}
+                robot.config.update(data['config'])
+                updated_fields.append('config')
+            
+            if 'properties' in data:
+                robot.properties = data['properties']
+                updated_fields.append('properties')
+            
+            # 更新时间戳
+            import datetime
+            robot.last_update = datetime.datetime.now().isoformat()
+            
+            # 保存到文件
+            self._save_robots_to_file()
+            
+            logger.info(f"机器人更新成功: {robot_id}, 更新字段: {updated_fields}")
+            self._send_json_response({"success": True, "message": "机器人信息更新成功"})
                 
         except Exception as e:
             logger.error(f"更新机器人失败: {e}")

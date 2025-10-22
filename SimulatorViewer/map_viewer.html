@@ -122,8 +122,51 @@
             overflow-y: auto;
         }
         
-        .robot-form {
+        /* 标签页导航样式 */
+        .sidebar-tabs {
+            display: flex;
+            border-bottom: 1px solid #34495e;
             margin-bottom: 20px;
+            flex-shrink: 0;
+        }
+        
+        .tab-button {
+            flex: 1;
+            background: none;
+            border: none;
+            color: #bdc3c7;
+            padding: 12px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .tab-button:hover {
+            color: #ecf0f1;
+            background-color: rgba(52, 73, 94, 0.5);
+        }
+        
+        .tab-button.active {
+            color: #3498db;
+            border-bottom-color: #3498db;
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+        
+        /* 标签页内容样式 */
+        .tab-content {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .robot-form {
+            padding: 20px 0;
             flex-shrink: 0;
         }
         
@@ -132,12 +175,14 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
+            padding: 20px 0;
         }
         
         .robot-list h3 {
             margin: 0 0 15px 0;
             color: #ecf0f1;
             flex-shrink: 0;
+            display: none; /* 隐藏h3标题，因为现在用标签页 */
         }
         
         #robotListContainer {
@@ -405,7 +450,7 @@
             padding: 15px;
             border-radius: 8px;
             font-size: 12px;
-            min-width: 200px;
+            min-width: 100px;
             backdrop-filter: blur(5px);
             z-index: 999;
         }
@@ -467,6 +512,37 @@
                     <button class="modal-close" onclick="closeConfigModal()">&times;</button>
                 </div>
                 <div class="form-group">
+                    <label class="form-label">机器人名称</label>
+                    <input type="text" class="form-input" id="configRobotName" placeholder="输入机器人名称">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">机器人类型</label>
+                    <select class="form-select" id="configRobotType">
+                        <option value="AGV">AGV</option>
+                        <option value="AMR">AMR</option>
+                        <option value="Forklift">叉车</option>
+                        <option value="Conveyor">输送机器人</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">机器人IP地址</label>
+                    <input type="text" class="form-input" id="configRobotIP" placeholder="192.168.1.100">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">厂商</label>
+                    <input type="text" class="form-input" id="configRobotManufacturer" placeholder="厂商名称" value="SEER">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">版本</label>
+                    <input type="text" class="form-input" id="configRobotVersion" placeholder="版本号" value="2.0.0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">初始位置</label>
+                    <select class="form-select" id="configInitialPosition">
+                        <option value="">选择初始位置</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label class="form-label">电量 (%)</label>
                     <input type="number" class="form-input" id="configBattery" value="100" min="0" max="100">
                 </div>
@@ -494,41 +570,60 @@
             <div class="sidebar-title">仿真机器人管理</div>
             <button class="sidebar-close" onclick="toggleSidebar()">×</button>
         </div>
+        
+        <!-- 标签页导航 -->
+        <div class="sidebar-tabs">
+            <button class="tab-button active" onclick="switchTab('register')">注册机器人</button>
+            <button class="tab-button" onclick="switchTab('list')">机器人列表</button>
+        </div>
+        
         <div class="sidebar-content">
-            <div class="robot-form">
-                <h3 style="margin-top: 0; color: #ecf0f1;">注册新机器人</h3>
-                <div class="form-group">
-                    <label class="form-label">机器人名称</label>
-                    <input type="text" class="form-input" id="robotName" placeholder="输入机器人名称">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">机器人类型</label>
-                    <select class="form-select" id="robotType">
-                        <option value="AGV">AGV</option>
-                        <option value="AMR">AMR</option>
-                        <option value="Forklift">叉车</option>
-                        <option value="Conveyor">输送机器人</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">机器人IP地址</label>
-                    <input type="text" class="form-input" id="robotIP" placeholder="192.168.1.100">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">初始位置</label>
-                    <select class="form-select" id="initialPosition">
-                        <option value="">选择初始位置</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <button class="btn-primary" onclick="registerRobot()">注册机器人</button>
+            <!-- 注册机器人标签页 -->
+            <div class="tab-content active" id="registerTab">
+                <div class="robot-form">
+                    <div class="form-group">
+                        <label class="form-label">机器人名称</label>
+                        <input type="text" class="form-input" id="robotName" placeholder="输入机器人名称">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">机器人类型</label>
+                        <select class="form-select" id="robotType">
+                            <option value="AGV">AGV</option>
+                            <option value="AMR">AMR</option>
+                            <option value="Forklift">叉车</option>
+                            <option value="Conveyor">输送机器人</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">机器人IP地址</label>
+                        <input type="text" class="form-input" id="robotIP" placeholder="192.168.1.100">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">厂商</label>
+                        <input type="text" class="form-input" id="robotManufacturer" placeholder="厂商名称" value="SEER">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">版本</label>
+                        <input type="text" class="form-input" id="robotVersion" placeholder="版本号" value="2.0.0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">初始位置</label>
+                        <select class="form-select" id="initialPosition">
+                            <option value="">选择初始位置</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn-primary" onclick="registerRobot()">注册机器人</button>
+                    </div>
                 </div>
             </div>
             
-            <div class="robot-list">
-                <h3>已注册机器人</h3>
-                <div id="robotListContainer">
-                    <!-- 机器人列表将在这里动态生成 -->
+            <!-- 机器人列表标签页 -->
+            <div class="tab-content" id="listTab">
+                <div class="robot-list">
+                    <div id="robotListContainer">
+                        <!-- 机器人列表将在这里动态生成 -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -550,11 +645,11 @@
             <div style="margin-bottom: 10px;"><strong>图例</strong></div>
             <div class="legend-item">
                 <div class="legend-color" style="background-color: #e74c3c;"></div>
-                <span>接驳点 (AP)</span>
+                <span>工作点 (AP)</span>
             </div>
             <div class="legend-item">
                 <div class="legend-color" style="background-color: #f39c12;"></div>
-                <span>路标点 (LM)</span>
+                <span>普通点 (LM)</span>
             </div>
             <div class="legend-item">
                 <div class="legend-color" style="background-color: #27ae60;"></div>
@@ -858,6 +953,23 @@
             }
         }
         
+        // 为配置模态框加载初始位置选项
+        function loadInitialPositionsForConfig() {
+            const select = document.getElementById('configInitialPosition');
+            select.innerHTML = '<option value="">选择初始位置</option>';
+            
+            if (mapData && mapData.points) {
+                mapData.points.forEach(point => {
+                    if (point.name) {
+                        const option = document.createElement('option');
+                        option.value = point.id;
+                        option.textContent = `${point.name} (${point.x.toFixed(2)}, ${point.y.toFixed(2)})`;
+                        select.appendChild(option);
+                    }
+                });
+            }
+        }
+        
         function fitMapToView() {
             if (!mapData || !mapData.points || mapData.points.length === 0) return;
             
@@ -966,10 +1078,10 @@
                 
                 if (point.name) {
                     if (point.name.startsWith('AP')) {
-                        color = '#e74c3c'; // 接驳点 - 红色
+                        color = '#e74c3c'; // 工作点 - 红色
                         size = 8;
                     } else if (point.name.startsWith('LM')) {
-                        color = '#f39c12'; // 路标点 - 橙色
+                        color = '#f39c12'; // 普通点 - 橙色
                         size = 6;
                     } else if (point.name.startsWith('CP')) {
                         color = '#27ae60'; // 充电点 - 绿色
@@ -1122,6 +1234,30 @@
             }, 300);
         }
         
+        // 标签页切换函数
+        function switchTab(tabName) {
+            // 移除所有标签按钮的active类
+            const tabButtons = document.querySelectorAll('.tab-button');
+            tabButtons.forEach(button => {
+                button.classList.remove('active');
+            });
+            
+            // 隐藏所有标签页内容
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // 激活选中的标签按钮和内容
+            if (tabName === 'register') {
+                document.querySelector('.tab-button[onclick="switchTab(\'register\')"]').classList.add('active');
+                document.getElementById('registerTab').classList.add('active');
+            } else if (tabName === 'list') {
+                document.querySelector('.tab-button[onclick="switchTab(\'list\')"]').classList.add('active');
+                document.getElementById('listTab').classList.add('active');
+            }
+        }
+        
         // 机器人配置相关函数
         let currentConfigRobotId = null;
         
@@ -1130,6 +1266,25 @@
             const robot = registeredRobots.find(r => r.id === robotId);
             
             if (robot) {
+                // 加载机器人基本信息
+                document.getElementById('configRobotName').value = robot.robot_name || '';
+                document.getElementById('configRobotType').value = robot.type || 'AGV';
+                document.getElementById('configRobotIP').value = robot.ip || '';
+                document.getElementById('configRobotManufacturer').value = robot.manufacturer || 'SEER';
+                document.getElementById('configRobotVersion').value = robot.version || '2.0.0';
+                
+                // 加载初始位置选项
+                loadInitialPositionsForConfig();
+                
+                // 设置初始位置值：如果是对象则取其id，如果是字符串则直接使用
+                if (robot.initialPosition) {
+                    const positionId = typeof robot.initialPosition === 'object' ? robot.initialPosition.id : robot.initialPosition;
+                    document.getElementById('configInitialPosition').value = positionId || '';
+                } else {
+                    document.getElementById('configInitialPosition').value = '';
+                }
+                
+                // 加载原有配置
                 document.getElementById('configBattery').value = robot.battery;
                 document.getElementById('configMaxSpeed').value = robot.maxSpeed;
                 document.getElementById('configOrientation').value = robot.orientation;
@@ -1141,20 +1296,49 @@
             if (currentConfigRobotId) {
                 const robot = registeredRobots.find(r => r.id === currentConfigRobotId);
                 if (robot) {
-                    // 更新本地数据
+                    // 更新机器人基本信息
+                    robot.robot_name = document.getElementById('configRobotName').value;
+                    robot.type = document.getElementById('configRobotType').value;
+                    robot.ip = document.getElementById('configRobotIP').value;
+                    robot.manufacturer = document.getElementById('configRobotManufacturer').value || 'SEER';
+                    robot.version = document.getElementById('configRobotVersion').value || '2.0.0';
+                    
+                    // 处理初始位置：将ID转换为完整的位置对象
+                    const initialPositionId = document.getElementById('configInitialPosition').value;
+                    if (initialPositionId && mapData && mapData.points) {
+                        const foundPoint = mapData.points.find(point => point.id === initialPositionId);
+                        robot.initialPosition = foundPoint || null;
+                    } else {
+                        robot.initialPosition = null;
+                    }
+                    
+                    // 更新原有配置
                     robot.battery = parseFloat(document.getElementById('configBattery').value);
                     robot.maxSpeed = parseFloat(document.getElementById('configMaxSpeed').value);
                     robot.orientation = parseFloat(document.getElementById('configOrientation').value);
                     
                     // 同步到后端
-                    updateRobotOnServer(currentConfigRobotId, {
+                    const updateData = {
+                        serialNumber: robot.robot_name,
+                        type: robot.type,
+                        ip: robot.ip,
+                        manufacturer: robot.manufacturer,
                         battery: robot.battery,
                         maxSpeed: robot.maxSpeed,
                         config: {
                             ...robot.config,
                             orientation: robot.orientation
                         }
-                    });
+                    };
+                    
+                    // 处理初始位置：只发送ID给后端
+                    if (robot.initialPosition && typeof robot.initialPosition === 'object') {
+                        updateData.initialPosition = robot.initialPosition.id;
+                    } else if (robot.initialPosition) {
+                        updateData.initialPosition = robot.initialPosition;
+                    }
+                    
+                    updateRobotOnServer(currentConfigRobotId, updateData);
                     
                     updateRobotList();
                     closeConfigModal();
@@ -1227,6 +1411,8 @@
             const robotName = document.getElementById('robotName').value.trim();
             const robotType = document.getElementById('robotType').value;
             const robotIP = document.getElementById('robotIP').value.trim();
+            const robotManufacturer = document.getElementById('robotManufacturer').value.trim() || 'SEER';
+            const robotVersion = document.getElementById('robotVersion').value.trim() || '2.0.0';
             const initialPosition = document.getElementById('initialPosition').value;
             
             // 验证输入
@@ -1253,7 +1439,7 @@
             }
             
             // 检查名称是否已存在
-            if (registeredRobots.find(robot => robot.name === robotName)) {
+            if (registeredRobots.find(robot => robot.robot_name === robotName)) {
                 alert('机器人名称已存在，请使用不同的名称');
                 return;
             }
@@ -1270,23 +1456,24 @@
                 initialPos = mapData.points.find(point => point.id === initialPosition);
             }
             
-            // 创建机器人数据
+            // 创建机器人数据 - 按照标准JSON格式
             const robotData = {
-                name: robotName,
+                serialNumber: robotName,
+                manufacturer: robotManufacturer,
                 type: robotType,
                 ip: robotIP,
+                status: "offline",
+                position: initialPos ? { x: initialPos.x, y: initialPos.y, rotate: robotConfig.orientation } : { x: 0, y: 0, rotate: 0 },
                 battery: robotConfig.battery,
                 maxSpeed: robotConfig.maxSpeed,
-                orientation: robotConfig.orientation,
-                position: initialPos ? { x: initialPos.x, y: initialPos.y, rotate: robotConfig.orientation } : { x: 0, y: 0, rotate: 0 },
+                gid: "default",
+                is_warning: false,
+                is_fault: false,
                 config: {
                     battery: robotConfig.battery,
                     maxSpeed: robotConfig.maxSpeed,
-                    orientation: robotConfig.orientation
-                },
-                properties: {
-                    initialPosition: initialPos,
-                    registeredAt: new Date().toISOString()
+                    orientation: robotConfig.orientation,
+                    initialPosition: initialPos ? initialPos.id : null
                 }
             };
             
@@ -1364,7 +1551,7 @@
                 // 转换后端数据格式为前端格式
                 registeredRobots = robotsData.map(robot => ({
                     id: robot.id,
-                    name: robot.name,
+                    robot_name: robot.serialNumber,
                     type: robot.type,
                     ip: robot.ip,
                     battery: robot.battery,
@@ -1404,14 +1591,14 @@
             container.innerHTML = registeredRobots.map(robot => `
                 <div class="robot-item">
                     <div class="robot-header">
-                        <div class="robot-name">${robot.name}</div>
+                        <div class="robot-name">${robot.robot_name}</div>
                         <button class="btn-small btn-config-small" onclick="openRobotConfig('${robot.id}')" title="配置">⚙️</button>
                     </div>
                     <div class="robot-info">
                         类型: ${robot.type} | IP: ${robot.ip}<br>
                         电量: ${robot.battery}% | 最大速度: ${robot.maxSpeed} m/s<br>
-                        ${robot.initialPosition ? 
-                            `初始位置: ${robot.initialPosition.name} (${robot.initialPosition.x.toFixed(2)}, ${robot.initialPosition.y.toFixed(2)})` : 
+                        ${robot.initialPosition && robot.initialPosition.x !== undefined && robot.initialPosition.y !== undefined ? 
+                            `初始位置: ${robot.initialPosition.name || '未命名'} (${robot.initialPosition.x.toFixed(2)}, ${robot.initialPosition.y.toFixed(2)})` : 
                             '无初始位置'}<br>
                         状态: ${robot.status} | 注册时间: ${robot.registeredAt}
                     </div>

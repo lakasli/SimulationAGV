@@ -141,7 +141,7 @@ class EditorService:
                                 else:
                                     robot_type = robot_data['type']
                             except (KeyError, ValueError):
-                                robot_type = RobotType.TYPE_1  # 默认类型
+                                robot_type = RobotType.AGV  # 默认类型
                         
                         # 确保必需字段存在
                         robot_dict = {

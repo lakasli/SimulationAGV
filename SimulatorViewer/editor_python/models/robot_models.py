@@ -8,9 +8,10 @@ from enum import Enum
 
 class RobotType(Enum):
     """机器人类型"""
-    TYPE_1 = 1
-    TYPE_2 = 2
-    TYPE_3 = 3
+    AGV = "AGV"
+    AMR = "AMR"
+    Forklift = "Forklift"
+    Conveyor = "Conveyor"
 
 
 class RobotStatus(Enum):
