@@ -48,5 +48,30 @@
       "orientation": 0,
       "initialPosition": "10584"
     }
+  },
+  {
+    "id": "f18cc6e9-5ffc-4f9d-b8db-9c6b0fe16151",
+    "serialNumber": "AMB-01",
+    "manufacturer": "SEER",
+    "type": "AGV",
+    "ip": "192.168.9.1",
+    "status": "offline",
+    "position": {
+      "x": -2.599,
+      "y": -5.779,
+      "rotate": 0
+    },
+    "battery": 100.0,
+    "maxSpeed": 2.0,
+    "gid": "default",
+    "is_warning": false,
+    "is_fault": false,
+    "last_update": null,
+    "config": {
+      "battery": 100,
+      "maxSpeed": 2,
+      "orientation": 0,
+      "initialPosition": "10585"
+    }
   }
 ]

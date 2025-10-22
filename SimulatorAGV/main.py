@@ -10,6 +10,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from core.instance_manager import InstanceManager
 from logger_config import logger
+from api import start_api_server, register_all_routes
 
 
 def main():
@@ -23,6 +24,10 @@ def main():
                         help='单机器人模式，指定机器人ID')
     parser.add_argument('--robots', '-n', type=int, default=None,
                         help='创建指定数量的测试机器人')
+    parser.add_argument('--api-host', type=str, default='localhost',
+                        help='API服务器主机地址 (默认: localhost)')
+    parser.add_argument('--api-port', type=int, default=8000,
+                        help='API服务器端口 (默认: 8000)')
     
     args = parser.parse_args()
     
@@ -44,6 +49,21 @@ def main():
     try:
         # 创建实例管理器
         manager = InstanceManager(config_path, registry_path)
+        
+        # 启动API服务器并注册路由
+        logger.info(f"启动API服务器: {args.api_host}:{args.api_port}")
+        api_server = start_api_server(args.api_host, args.api_port)
+        register_all_routes(manager)
+        
+        # 显示注册的API路由
+        try:
+            routes = api_server.get_registry().get_routes()
+            logger.info("已注册的API路由:")
+            for route in routes:
+                logger.info(f"  {route['method']} {route['path']}")
+        except Exception as e:
+            logger.error(f"获取API路由信息失败: {e}")
+            # 继续执行，不因为这个错误而停止
         
         if args.single:
             # 单机器人模式
@@ -110,6 +130,12 @@ def main():
         # 优雅关闭
         logger.info("正在停止所有机器人实例...")
         manager.stop_all()
+        
+        # 停止API服务器
+        from api import stop_api_server
+        stop_api_server()
+        logger.info("API服务器已停止")
+        
         logger.info("多机器人模拟器已停止")
         
         return 0
