@@ -3,127 +3,122 @@ import time
 import signal
 import sys
 import os
+import argparse
 
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from utils import load_config
-from agv_simulator import AgvSimulator
-from mqtt_client import MqttClient
-from vda5050.connection import Connection
+from core.instance_manager import InstanceManager
 from logger_config import logger
 
 
-class Vda5050AgvSimulator:
-    def __init__(self, config_path: str = None):
-        # 如果没有指定配置路径，使用默认路径
-        if config_path is None:
-            # 获取当前文件所在目录
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            config_path = os.path.join(current_dir, "config.json")
+def main():
+    """主函数，启动多机器人模拟器"""
+    parser = argparse.ArgumentParser(description='VDA5050 多机器人AGV模拟器')
+    parser.add_argument('--config', '-c', type=str, default='config.json',
+                        help='基础配置文件路径 (默认: config.json)')
+    parser.add_argument('--registry', '-r', type=str, default='registered_robots.json',
+                        help='机器人注册文件路径 (默认: registered_robots.json)')
+    parser.add_argument('--single', '-s', type=str, 
+                        help='单机器人模式，指定机器人ID')
+    parser.add_argument('--robots', '-n', type=int, default=None,
+                        help='创建指定数量的测试机器人')
+    
+    args = parser.parse_args()
+    
+    # 获取当前文件所在目录
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # 处理配置文件路径
+    if not os.path.isabs(args.config):
+        config_path = os.path.join(current_dir, args.config)
+    else:
+        config_path = args.config
+    
+    # 处理注册文件路径
+    if not os.path.isabs(args.registry):
+        registry_path = os.path.join(current_dir, args.registry)
+    else:
+        registry_path = args.registry
+    
+    try:
+        # 创建实例管理器
+        manager = InstanceManager(config_path, registry_path)
         
-        # 加载配置
-        self.config = load_config(config_path)
+        if args.single:
+            # 单机器人模式
+            logger.info(f"启动单机器人模式，机器人ID: {args.single}")
+            success = manager.start_robot(args.single)
+            if not success:
+                logger.error(f"无法启动机器人 {args.single}")
+                return 1
+        elif args.robots:
+            # 创建指定数量的测试机器人
+            logger.info(f"创建 {args.robots} 个测试机器人")
+            for i in range(args.robots):
+                robot_info = {
+                    "id": f"test_robot_{i+1:03d}",
+                    "serialNumber": f"TEST{i+1:03d}",
+                    "manufacturer": "TestManufacturer",
+                    "type": "AGV",
+                    "ip": "127.0.0.1",
+                    "status": "IDLE",
+                    "position": {"x": i * 10, "y": 0, "theta": 0, "mapId": "test_map"},
+                    "battery": 100,
+                    "maxSpeed": 2.0,
+                    "gid": f"test_gid_{i+1}",
+                    "is_warning": False,
+                    "is_fault": False,
+                    "config": {
+                        "mqtt": {
+                            "port": 1883 + (i % 10)  # 使用不同端口避免冲突
+                        },
+                        "vehicle": {
+                            "serial_number": f"TEST{i+1:03d}",
+                            "manufacturer": "TestManufacturer"
+                        }
+                    }
+                }
+                manager.add_robot(robot_info)
+            
+            # 启动所有机器人
+            manager.start_all()
+        else:
+            # 从注册文件加载机器人
+            logger.info(f"从注册文件加载机器人: {registry_path}")
+            manager.load_robots_from_registry()
+            
+            # 启动所有机器人
+            manager.start_all()
         
-        # 创建AGV模拟器
-        self.agv_simulator = AgvSimulator(self.config)
+        # 显示运行状态
+        status = manager.get_robot_status()
+        logger.info(f"成功启动 {manager.get_robot_count()} 个机器人实例")
+        for robot_id in manager.get_robot_list():
+            robot_status = manager.get_robot_status(robot_id)
+            logger.info(f"  - {robot_id}: {robot_status['status']}")
         
-        # 创建MQTT客户端
-        self.mqtt_client = MqttClient(self.config, self._handle_mqtt_message)
+        logger.info("多机器人模拟器已启动，按 Ctrl+C 停止...")
         
-        # 运行状态标志
-        self.running = True
-        
-        # 注册信号处理器以优雅地关闭
-        signal.signal(signal.SIGINT, self._signal_handler)
-        signal.signal(signal.SIGTERM, self._signal_handler)
-
-    def _handle_mqtt_message(self, topic: str, payload: str):
-        """处理MQTT消息"""
+        # 保持程序运行
         try:
-            # 根据主题处理不同类型的VDA5050消息
-            if topic.endswith("/order"):
-                order = self.mqtt_client.handle_order_message(payload)
-                if order:
-                    self.agv_simulator.accept_order(order)
-            elif topic.endswith("/instantActions"):
-                instant_actions = self.mqtt_client.handle_instant_actions_message(payload)
-                if instant_actions:
-                    self.agv_simulator.accept_instant_actions(instant_actions)
-            else:
-                logger.warning(f"未知主题的消息: {topic}")
-        except Exception as e:
-            logger.error(f"处理MQTT消息时出错: {e}")
-
-    def _signal_handler(self, signum, frame):
-        """信号处理器，用于关闭程序"""
-        logger.info("\n接收到关闭信号，正在停止...")
-        self.running = False
-
-    def start(self):
-        """启动AGV模拟器"""
-        logger.info("启动VDA5050 AGV模拟器...")
-        
-        # 连接到MQTT代理
-        self.mqtt_client.connect()
-        
-        # 发布初始连接消息
-        self._publish_connection_message(Connection.CONNECTION_STATE_ONLINE)
-        
-        # 发布初始状态消息
-        self._publish_state_message()
-        
-        # 主循环
-        while self.running:
-            try:
-                # 更新AGV状态
-                self.agv_simulator.update_state()
-                
-                # 定期发布状态和可视化消息
-                self._publish_state_message()
-                self._publish_visualization_message()
-                
-                # 等待指定的时间间隔
-                time.sleep(1.0 / self.config['settings']['state_frequency'])
-            except Exception as e:
-                logger.error(f"运行时出错: {e}")
+            while True:
                 time.sleep(1)
-
-        # 程序结束前发布离线消息
-        self._publish_connection_message(Connection.CONNECTION_STATE_OFFLINE)
-        self.mqtt_client.disconnect()
-        logger.info("AGV模拟器已停止")
-
-    def _publish_connection_message(self, state: str):
-        """发布连接消息"""
-        self.agv_simulator.set_connection_state(state)
-        message = self.agv_simulator.get_connection_message()
-        self.mqtt_client.publish(
-            self.agv_simulator.connection_topic,
-            message,
-            qos=1,
-            retain=True
-        )
-
-    def _publish_state_message(self):
-        """发布状态消息"""
-        message = self.agv_simulator.get_state_message()
-        self.mqtt_client.publish(
-            self.agv_simulator.state_topic,
-            message,
-            qos=0
-        )
-
-    def _publish_visualization_message(self):
-        """发布可视化消息"""
-        message = self.agv_simulator.get_visualization_message()
-        self.mqtt_client.publish(
-            self.agv_simulator.visualization_topic,
-            message,
-            qos=0
-        )
+        except KeyboardInterrupt:
+            logger.info("\n接收到停止信号...")
+        
+        # 优雅关闭
+        logger.info("正在停止所有机器人实例...")
+        manager.stop_all()
+        logger.info("多机器人模拟器已停止")
+        
+        return 0
+        
+    except Exception as e:
+        logger.error(f"启动失败: {e}")
+        return 1
 
 
 if __name__ == "__main__":
-    simulator = Vda5050AgvSimulator()
-    simulator.start()
+    exit_code = main()
+    sys.exit(exit_code)

@@ -1,0 +1,13 @@
+<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+  <!-- 矩形底盘 -->
+  <rect x="8" y="15" width="24" height="24" rx="2" ry="2" 
+        fill="#4A90E2" stroke="#2E5C8A" stroke-width="1"/>
+  
+  <!-- 半圆形车身（车头方向） -->
+  <path d="M 8 23 A 12 12 0 0 0 32 23 Z" 
+        fill="#6BB6FF" stroke="#2E5C8A" stroke-width="1"/>
+  
+  <!-- 三角形车头方向指示 -->
+  <polygon points="20,12 16,20 24,20" 
+           fill="#FF6B6B" stroke="#D63031" stroke-width="1"/>
+</svg>

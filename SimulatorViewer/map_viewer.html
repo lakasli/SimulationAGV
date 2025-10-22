@@ -782,6 +782,9 @@
             loadMapData();
             setupEventListeners();
             await loadRobotList(); // 从后端加载机器人列表
+            
+            // 启动机器人实例状态监控
+            startInstanceStatusMonitoring();
         };
         
         function initCanvas() {
@@ -1030,6 +1033,11 @@
             if (mapData.points) {
                 drawPoints();
             }
+            
+            // 绘制机器人位置
+            if (registeredRobots && registeredRobots.length > 0) {
+                drawRobots();
+            }
         }
         
         function drawGrid() {
@@ -1197,6 +1205,90 @@
             ctx.restore();
         }
         
+        function drawRobots() {
+            registeredRobots.forEach(robot => {
+                // 优先使用当前位置，如果没有则使用初始位置
+                let position = null;
+                if (robot.currentPosition && robot.currentPosition.x !== undefined && robot.currentPosition.y !== undefined) {
+                    position = robot.currentPosition;
+                } else if (robot.initialPosition && robot.initialPosition.x !== undefined && robot.initialPosition.y !== undefined) {
+                    position = robot.initialPosition;
+                }
+                
+                if (!position) return;
+                
+                const screenPos = worldToScreen(position.x, position.y);
+                
+                // 只绘制在视口内的机器人
+                if (screenPos.x < -50 || screenPos.x > canvas.width + 50 ||
+                    screenPos.y < -50 || screenPos.y > canvas.height + 50) {
+                    return;
+                }
+                
+                drawRobotIcon(screenPos.x, screenPos.y, position.rotate || 0, robot);
+            });
+        }
+        
+        function drawRobotIcon(x, y, rotation, robot) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rotation * Math.PI / 180); // 转换为弧度
+            
+            const scale = Math.max(0.5, Math.min(2, viewTransform.scale));
+            ctx.scale(scale, scale);
+            
+            // 绘制矩形底盘
+            ctx.fillStyle = '#4A90E2';
+            ctx.strokeStyle = '#2E5C8A';
+            ctx.lineWidth = 1;
+            ctx.fillRect(-12, -12, 24, 24);
+            ctx.strokeRect(-12, -12, 24, 24);
+            
+            // 绘制半圆形车身（车头方向）
+            ctx.fillStyle = '#6BB6FF';
+            ctx.beginPath();
+            ctx.arc(0, -12, 12, 0, Math.PI, true);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            // 绘制三角形车头方向指示
+            ctx.fillStyle = '#FF6B6B';
+            ctx.strokeStyle = '#D63031';
+            ctx.beginPath();
+            ctx.moveTo(0, -22);
+            ctx.lineTo(-4, -14);
+            ctx.lineTo(4, -14);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.restore();
+            
+            // 绘制机器人标签
+            if (viewTransform.scale > 0.5 && robot.robot_name) {
+                ctx.save();
+                ctx.fillStyle = '#ecf0f1';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.strokeStyle = '#2c3e50';
+                ctx.lineWidth = 3;
+                ctx.strokeText(robot.robot_name, x, y - 5);
+                ctx.fillText(robot.robot_name, x, y - 5);
+                
+                // 显示状态信息
+                if (viewTransform.scale > 1) {
+                    ctx.font = '10px Arial';
+                    const statusColor = robot.status === 'online' ? '#27ae60' : '#e74c3c';
+                    ctx.fillStyle = statusColor;
+                    ctx.strokeText(`${robot.status} | ${robot.battery}%`, x, y + 15);
+                    ctx.fillText(`${robot.status} | ${robot.battery}%`, x, y + 15);
+                }
+                
+                ctx.restore();
+            }
+        }
+        
         // 控制函数
         function resetView() {
             fitMapToView();
@@ -1341,6 +1433,16 @@
                     updateRobotOnServer(currentConfigRobotId, updateData);
                     
                     updateRobotList();
+                
+                // 重新绘制地图以显示机器人位置
+                if (mapData) {
+                    drawMap();
+                }
+                
+                // 重新绘制地图以显示机器人位置
+                if (mapData) {
+                    drawMap();
+                }
                     closeConfigModal();
                 }
             } else {
@@ -1397,6 +1499,72 @@
         }
         
 
+        
+        // 机器人实例状态监控
+        let instanceStatusInterval = null;
+        let robotInstancesStatus = {};
+        
+        // 启动机器人实例状态监控
+        function startInstanceStatusMonitoring() {
+            if (instanceStatusInterval) {
+                clearInterval(instanceStatusInterval);
+            }
+            
+            // 立即获取一次状态
+            updateRobotInstancesStatus();
+            
+            // 每5秒更新一次状态
+            instanceStatusInterval = setInterval(updateRobotInstancesStatus, 5000);
+        }
+        
+        // 停止机器人实例状态监控
+        function stopInstanceStatusMonitoring() {
+            if (instanceStatusInterval) {
+                clearInterval(instanceStatusInterval);
+                instanceStatusInterval = null;
+            }
+        }
+        
+        // 更新机器人实例状态
+        async function updateRobotInstancesStatus() {
+            try {
+                const response = await loggedFetch(`${API_BASE_URL}/robot-instances/status`);
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success && result.instances && result.instances.instances) {
+                        // 将实例数组转换为以robot_id为键的对象
+                        robotInstancesStatus = {};
+                        result.instances.instances.forEach(instance => {
+                            robotInstancesStatus[instance.robot_id] = {
+                                status: instance.running ? 'running' : 'stopped',
+                                robot_status: instance.status, // 机器人的在线状态
+                                running: instance.running,
+                                last_update: instance.last_update,
+                                position: instance.position,
+                                battery: instance.battery,
+                                serial_number: instance.serial_number
+                            };
+                        });
+                        
+                        // 同时更新注册机器人列表中的状态
+                        registeredRobots.forEach(robot => {
+                            const instanceStatus = robotInstancesStatus[robot.id];
+                            if (instanceStatus) {
+                                robot.status = instanceStatus.robot_status; // 更新机器人在线状态
+                                robot.battery = instanceStatus.battery; // 更新电池状态
+                                if (instanceStatus.position) {
+                                    robot.currentPosition = instanceStatus.position; // 更新位置
+                                }
+                            }
+                        });
+                        
+                        updateRobotListWithInstanceStatus();
+                    }
+                }
+            } catch (error) {
+                console.warn('获取机器人实例状态失败:', error);
+            }
+        }
         
         // 点击模态框外部关闭
         window.onclick = function(event) {
@@ -1515,7 +1683,7 @@
                     clearRobotForm();
                     
                     // 显示成功消息
-                    document.getElementById('status').textContent = `机器人 ${robotName} 注册成功`;
+                    document.getElementById('status').textContent = `机器人 ${robotName} 注册成功，实例正在启动...`;
                     setTimeout(() => {
                         document.getElementById('status').textContent = '准备就绪';
                     }, 3000);
@@ -1554,11 +1722,16 @@
                     robot_name: robot.serialNumber,
                     type: robot.type,
                     ip: robot.ip,
+                    manufacturer: robot.manufacturer,
                     battery: robot.battery,
                     maxSpeed: robot.maxSpeed,
                     orientation: robot.config?.orientation || 0,
                     status: robot.status,
-                    currentPosition: robot.position,
+                    currentPosition: robot.position ? {
+                        x: robot.position.x,
+                        y: robot.position.y,
+                        orientation: robot.position.rotate
+                    } : null,
                     registeredAt: robot.properties?.registeredAt ? 
                         new Date(robot.properties.registeredAt).toLocaleString() : 
                         '未知',
@@ -1566,6 +1739,11 @@
                 }));
                 
                 updateRobotList();
+                
+                // 重新绘制地图以显示机器人位置
+                if (mapData) {
+                    drawMap();
+                }
                 
             } catch (error) {
                 console.error('加载机器人列表失败:', error);
@@ -1588,25 +1766,55 @@
                 return;
             }
             
-            container.innerHTML = registeredRobots.map(robot => `
-                <div class="robot-item">
-                    <div class="robot-header">
-                        <div class="robot-name">${robot.robot_name}</div>
-                        <button class="btn-small btn-config-small" onclick="openRobotConfig('${robot.id}')" title="配置">⚙️</button>
+            container.innerHTML = registeredRobots.map(robot => {
+                // 获取机器人实例状态
+                const instanceStatus = robotInstancesStatus[robot.id] || {};
+                const isInstanceRunning = instanceStatus.status === 'running';
+                const instanceStatusText = isInstanceRunning ? '运行中' : '已停止';
+                const instanceStatusColor = isInstanceRunning ? '#27ae60' : '#e74c3c';
+                
+                // 获取机器人在线状态
+                const robotOnlineStatus = robot.status || 'offline';
+                const isOnline = robotOnlineStatus === 'online';
+                const onlineStatusText = isOnline ? '在线' : '离线';
+                const onlineStatusColor = isOnline ? '#27ae60' : '#e74c3c';
+                
+                return `
+                    <div class="robot-item">
+                        <div class="robot-header">
+                            <div class="robot-name">${robot.robot_name}</div>
+                        </div>
+                        <div class="robot-info">
+                            类型: ${robot.type} | IP: ${robot.ip}<br>
+                            厂商: ${robot.manufacturer || '未知'} | 电量: ${robot.battery}% <br>
+                            ${robot.currentPosition && robot.currentPosition.x !== undefined && robot.currentPosition.y !== undefined ? 
+                                `当前位置: (${robot.currentPosition.x.toFixed(2)}, ${robot.currentPosition.y.toFixed(2)}) | 方向: ${robot.currentPosition.orientation || 0}°` : 
+                                '位置未知'}<br>
+                            ${robot.hasWarning || robot.hasError ? 
+                                `<span style="color: ${robot.hasError ? '#e74c3c' : '#f39c12'}; font-weight: bold;">状态: ${robot.hasError ? '错误' : '警告'}</span><br>` : 
+                                '<span style="color: #27ae60; font-weight: bold;">状态: 正常</span><br>'
+                            }
+                            <span style="color: #9b59b6; font-weight: bold;">任务状态: ${robot.taskId ? `任务ID: ${robot.taskId}` : '无任务'}</span><br>
+                            <span style="color: ${onlineStatusColor}; font-weight: bold;">通信状态: ${onlineStatusText}</span> |
+                            <span style="color: ${instanceStatusColor}; font-weight: bold;">实例状态: ${instanceStatusText}</span><br>
+
+                        </div>
+                        <div class="robot-actions">
+                            <button class="btn-small btn-danger" onclick="removeRobot('${robot.id}')">删除</button>
+                            <button class="btn-small btn-config-small" onclick="openRobotConfig('${robot.id}')">配置</button>
+                            ${instanceStatus.last_update ? `
+                            <div style="font-size: 0.8em; color: #7f8c8d; margin-top: 5px;">
+                                最后更新: ${new Date(instanceStatus.last_update).toLocaleTimeString()}
+                            </div>` : ''}
+                        </div>
                     </div>
-                    <div class="robot-info">
-                        类型: ${robot.type} | IP: ${robot.ip}<br>
-                        电量: ${robot.battery}% | 最大速度: ${robot.maxSpeed} m/s<br>
-                        ${robot.initialPosition && robot.initialPosition.x !== undefined && robot.initialPosition.y !== undefined ? 
-                            `初始位置: ${robot.initialPosition.name || '未命名'} (${robot.initialPosition.x.toFixed(2)}, ${robot.initialPosition.y.toFixed(2)})` : 
-                            '无初始位置'}<br>
-                        状态: ${robot.status} | 注册时间: ${robot.registeredAt}
-                    </div>
-                    <div class="robot-actions">
-                        <button class="btn-small btn-danger" onclick="removeRobot('${robot.id}')">删除</button>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
+        }
+        
+        // 更新机器人列表并包含实例状态
+        function updateRobotListWithInstanceStatus() {
+            updateRobotList();
         }
         
         async function removeRobot(robotId) {
@@ -1623,7 +1831,7 @@
                     // 重新加载机器人列表
                     await loadRobotList();
                     
-                    document.getElementById('status').textContent = '机器人已删除';
+                    document.getElementById('status').textContent = '机器人已删除，实例已停止';
                     setTimeout(() => {
                         document.getElementById('status').textContent = '准备就绪';
                     }, 2000);

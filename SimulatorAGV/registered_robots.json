@@ -1,0 +1,52 @@
+[
+  {
+    "id": "76ba0122-b869-4fd4-9635-521ba68cb21c",
+    "serialNumber": "AMB-02",
+    "manufacturer": "SEER",
+    "type": "AGV",
+    "ip": "192.168.9.2",
+    "status": "offline",
+    "position": {
+      "x": -6.799,
+      "y": -4.574,
+      "rotate": 0
+    },
+    "battery": 100.0,
+    "maxSpeed": 2.0,
+    "gid": "default",
+    "is_warning": false,
+    "is_fault": false,
+    "last_update": "2025-10-22T15:58:06.620213",
+    "config": {
+      "battery": 100,
+      "maxSpeed": 2,
+      "orientation": 0,
+      "initialPosition": "10585"
+    }
+  },
+  {
+    "id": "de281bb5-0ac3-4ccd-98da-922bc8448cbe",
+    "serialNumber": "AMB-03",
+    "manufacturer": "SEER",
+    "type": "AGV",
+    "ip": "192.168.9.3",
+    "status": "offline",
+    "position": {
+      "x": -2.599,
+      "y": -6.979,
+      "rotate": 0
+    },
+    "battery": 100.0,
+    "maxSpeed": 2.0,
+    "gid": "default",
+    "is_warning": false,
+    "is_fault": false,
+    "last_update": "2025-10-22T15:27:17.615500",
+    "config": {
+      "battery": 100,
+      "maxSpeed": 2,
+      "orientation": 0,
+      "initialPosition": "10584"
+    }
+  }
+]

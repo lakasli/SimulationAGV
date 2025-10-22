@@ -18,6 +18,7 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 
 from services.editor_service import EditorService
+from services.robot_instance_service import RobotInstanceService
 from models.map_models import Point, MapPointType, MapRouteType, MapAreaType, Rect
 from models.robot_models import RobotType, RobotStatus
 from logger_config import logger
@@ -29,8 +30,9 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
     # 设置HTTP协议版本为1.1，解决前端ERR_INVALID_HTTP_RESPONSE问题
     protocol_version = 'HTTP/1.1'
     
-    def __init__(self, *args, editor_service: EditorService = None, **kwargs):
+    def __init__(self, *args, editor_service: EditorService = None, robot_instance_service: RobotInstanceService = None, **kwargs):
         self.editor_service = editor_service or EditorService()
+        self.robot_instance_service = robot_instance_service or RobotInstanceService()
         super().__init__(*args, **kwargs)
     
     def do_GET(self):
@@ -66,6 +68,9 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
             elif path == '/api/areas':
                 logger.info("[API] 处理区域列表请求")
                 self._handle_get_areas(query_params)
+            elif path == '/api/robot-instances/status':
+                logger.info("[API] 处理机器人实例状态请求")
+                self._handle_get_robot_instances_status()
             else:
                 logger.warning(f"[API] 未知的GET路径: {path}")
                 self._send_error(404, f"路径不存在: {path}")
@@ -530,9 +535,10 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
         """保存机器人数据到JSON文件"""
         try:
             logger.info("开始保存机器人数据到文件...")
-            # 修正路径计算，确保指向正确的SimAGVList目录
+            # 修改路径计算，指向 SimulatorAGV 目录
             base_dir = os.path.dirname(os.path.dirname(current_dir))  # 到 SimulatorViewer
-            robots_dir = os.path.join(base_dir, "SimAGVList")
+            project_root = os.path.dirname(base_dir)  # 到项目根目录
+            robots_dir = os.path.join(project_root, "SimulatorAGV")
             logger.info(f"机器人目录: {robots_dir}")
             os.makedirs(robots_dir, exist_ok=True)
             
@@ -574,10 +580,11 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
     def _load_robots_from_file(self):
         """从JSON文件加载机器人数据"""
         try:
-            # 修正路径计算，确保指向正确的SimAGVList目录
-            # current_dir 是 api 目录，需要向上两级到 SimulatorViewer，然后进入 SimAGVList
+            # 修改路径计算，指向 SimulatorAGV 目录
+            # current_dir 是 api 目录，需要向上两级到 SimulatorViewer，然后到项目根目录，再进入 SimulatorAGV
             base_dir = os.path.dirname(os.path.dirname(current_dir))  # 到 SimulatorViewer
-            robots_dir = os.path.join(base_dir, "SimAGVList")
+            project_root = os.path.dirname(base_dir)  # 到项目根目录
+            robots_dir = os.path.join(project_root, "SimulatorAGV")
             robots_file = os.path.join(robots_dir, "registered_robots.json")
             
             print(f"[DEBUG] 尝试从文件加载机器人数据: {robots_file}")
@@ -714,7 +721,34 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
             self.editor_service.robot_service.robots[robot_id] = robot_info
             self._save_robots_to_file()
             
-            # 7. 返回成功响应
+            # 7. 启动机器人实例
+            try:
+                # 准备机器人实例数据
+                instance_data = {
+                    "id": robot_id,
+                    "serialNumber": robot_name,
+                    "manufacturer": data.get('manufacturer', 'SEER'),
+                    "type": data['type'],
+                    "ip": robot_ip,
+                    "status": "offline",
+                    "position": data.get('position', {"x": 0, "y": 0, "rotate": 0}),
+                    "battery": float(data.get('battery', 100.0)),
+                    "maxSpeed": float(data.get('maxSpeed', 2.0)),
+                    "gid": data.get('gid', "default"),
+                    "is_warning": data.get('is_warning', False),
+                    "is_fault": data.get('is_fault', False),
+                    "config": data.get('config', {})
+                }
+                
+                # 启动机器人实例
+                start_result = self.robot_instance_service.start_robot_instance(instance_data)
+                logger.info(f"机器人实例启动结果: {start_result}")
+                
+            except Exception as e:
+                logger.warning(f"启动机器人实例失败: {e}")
+                # 即使实例启动失败，机器人注册仍然成功
+            
+            # 8. 返回成功响应
             response_data = {
                 "success": True,
                 "robot_id": robot_id,
@@ -1034,6 +1068,14 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
                 self._send_error(404, f"机器人 {robot_id} 不存在")
                 return
             
+            # 停止机器人实例
+            try:
+                stop_result = self.robot_instance_service.stop_robot_instance(robot_id)
+                logger.info(f"机器人实例停止结果: {stop_result}")
+            except Exception as e:
+                logger.warning(f"停止机器人实例失败: {e}")
+                # 即使实例停止失败，仍然继续删除机器人记录
+            
             # 删除机器人
             removed_count = self.editor_service.robot_service.remove_robots([robot_id])
             if removed_count > 0:
@@ -1046,6 +1088,18 @@ class MapEditorAPIHandler(BaseHTTPRequestHandler):
         except Exception as e:
             logger.error(f"删除机器人失败: {e}")
             self._send_error(500, f"删除机器人失败: {e}")
+
+    def _handle_get_robot_instances_status(self):
+        """获取机器人实例状态"""
+        try:
+            status_data = self.robot_instance_service.get_all_instances_status()
+            self._send_json_response({
+                "success": True,
+                "instances": status_data
+            })
+        except Exception as e:
+            logger.error(f"获取机器人实例状态失败: {e}")
+            self._send_error(500, f"获取机器人实例状态失败: {e}")
 
     def _handle_frontend_log(self, data: Dict[str, Any]):
         """处理前端日志请求"""
@@ -1089,6 +1143,7 @@ class MapEditorAPIServer:
         self.host = host
         self.port = port
         self.editor_service = EditorService()
+        self.robot_instance_service = RobotInstanceService()
         self.server: Optional[HTTPServer] = None
         self.server_thread: Optional[threading.Thread] = None
         self.is_running = False
@@ -1096,10 +1151,11 @@ class MapEditorAPIServer:
     def create_handler(self):
         """创建请求处理器"""
         editor_service = self.editor_service
+        robot_instance_service = self.robot_instance_service
         
         class Handler(MapEditorAPIHandler):
             def __init__(self, *args, **kwargs):
-                super().__init__(*args, editor_service=editor_service, **kwargs)
+                super().__init__(*args, editor_service=editor_service, robot_instance_service=robot_instance_service, **kwargs)
         
         return Handler
     
@@ -1194,3 +1250,33 @@ def stop_api_server():
     if _api_server:
         _api_server.stop()
         _api_server = None
+
+
+if __name__ == "__main__":
+    """主函数，用于直接运行API服务器"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='启动地图编辑器API服务器')
+    parser.add_argument('--host', default='localhost', help='服务器主机地址 (默认: localhost)')
+    parser.add_argument('--port', type=int, default=8001, help='服务器端口 (默认: 8001)')
+    
+    args = parser.parse_args()
+    
+    try:
+        logger.info(f"正在启动API服务器 - 主机: {args.host}, 端口: {args.port}")
+        server = start_api_server(args.host, args.port)
+        logger.info(f"API服务器已启动，访问地址: http://{args.host}:{args.port}")
+        
+        # 保持服务器运行
+        try:
+            while server.is_running:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("收到中断信号，正在停止服务器...")
+            stop_api_server()
+            logger.info("API服务器已停止")
+            
+    except Exception as e:
+        logger.error(f"启动API服务器失败: {e}")
+        import traceback
+        traceback.print_exc()
