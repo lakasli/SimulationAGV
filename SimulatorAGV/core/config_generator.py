@@ -13,13 +13,22 @@ class ConfigGenerator:
         初始化配置生成器
         
         Args:
-            base_config_path: 基础配置文件路径
+            base_config_path: 基础配置文件路径 (已弃用，建议使用共享配置)
         """
         self.base_config_path = base_config_path
-        self.base_config = self._load_base_config()
+        
+        # 尝试使用新的配置管理，如果失败则回退到原始方式
+        try:
+            from shared import get_config
+            self.shared_config = get_config()
+            self.base_config = self.shared_config.to_dict()
+        except Exception:
+            # 回退到原始实现
+            self.shared_config = None
+            self.base_config = self._load_base_config()
     
     def _load_base_config(self) -> Dict[str, Any]:
-        """加载基础配置文件"""
+        """加载基础配置文件 (回退方法)"""
         try:
             with open(self.base_config_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
@@ -56,7 +65,7 @@ class ConfigGenerator:
         为单个机器人生成配置
         
         Args:
-            robot_info: 机器人信息，包含serialNumber, manufacturer等
+            robot_info: 机器人信息，包含id, serialNumber, manufacturer, type, ip
             
         Returns:
             机器人的完整配置
@@ -71,39 +80,22 @@ class ConfigGenerator:
         # 更新MQTT配置，确保每个机器人有唯一的客户端ID
         robot_config["mqtt_broker"]["client_id"] = f"{robot_config['vehicle']['manufacturer']}_{robot_config['vehicle']['serial_number']}_{int(datetime.now().timestamp())}"
         
-        # 如果机器人信息中包含IP地址，可以用于特定的MQTT代理配置
+        # 添加机器人IP地址
         if "ip" in robot_info:
             robot_config["robot_ip"] = robot_info["ip"]
-        
-        # 添加机器人特定的设置
-        if "config" in robot_info:
-            robot_specific_config = robot_info["config"]
-            
-            # 更新电池设置
-            if "battery" in robot_specific_config:
-                robot_config["settings"]["initial_battery"] = robot_specific_config["battery"]
-            
-            # 更新最大速度
-            if "maxSpeed" in robot_specific_config:
-                robot_config["settings"]["max_speed"] = robot_specific_config["maxSpeed"]
-            
-            # 更新初始方向
-            if "orientation" in robot_specific_config:
-                robot_config["settings"]["initial_orientation"] = robot_specific_config["orientation"]
-            
-            # 更新初始位置
-            if "initialPosition" in robot_specific_config:
-                robot_config["settings"]["initial_position"] = robot_specific_config["initialPosition"]
-        
-        # 添加位置信息
-        if "position" in robot_info:
-            robot_config["settings"]["initial_x"] = robot_info["position"]["x"]
-            robot_config["settings"]["initial_y"] = robot_info["position"]["y"]
-            robot_config["settings"]["initial_theta"] = robot_info["position"].get("rotate", 0)
         
         # 添加机器人ID和类型
         robot_config["robot_id"] = robot_info.get("id", str(uuid.uuid4()))
         robot_config["robot_type"] = robot_info.get("type", "AMR")
+        
+        # 设置默认的初始位置和状态
+        robot_config["settings"]["initial_x"] = 0.0
+        robot_config["settings"]["initial_y"] = 0.0
+        robot_config["settings"]["initial_theta"] = 0.0
+        robot_config["settings"]["initial_battery"] = 100.0
+        robot_config["settings"]["max_speed"] = 2.0
+        robot_config["settings"]["initial_orientation"] = 0
+        robot_config["settings"]["initial_position"] = "0"
         
         return robot_config
     

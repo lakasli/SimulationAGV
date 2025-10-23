@@ -1,77 +1,16 @@
 [
   {
-    "id": "76ba0122-b869-4fd4-9635-521ba68cb21c",
-    "serialNumber": "AMB-02",
-    "manufacturer": "SEER",
-    "type": "AGV",
-    "ip": "192.168.9.2",
-    "status": "offline",
-    "position": {
-      "x": -6.799,
-      "y": -4.574,
-      "rotate": 0
-    },
-    "battery": 100.0,
-    "maxSpeed": 2.0,
-    "gid": "default",
-    "is_warning": false,
-    "is_fault": false,
-    "last_update": "2025-10-22T15:58:06.620213",
-    "config": {
-      "battery": 100,
-      "maxSpeed": 2,
-      "orientation": 0,
-      "initialPosition": "10585"
-    }
-  },
-  {
-    "id": "de281bb5-0ac3-4ccd-98da-922bc8448cbe",
-    "serialNumber": "AMB-03",
-    "manufacturer": "SEER",
-    "type": "AGV",
-    "ip": "192.168.9.3",
-    "status": "offline",
-    "position": {
-      "x": -2.599,
-      "y": -6.979,
-      "rotate": 0
-    },
-    "battery": 100.0,
-    "maxSpeed": 2.0,
-    "gid": "default",
-    "is_warning": false,
-    "is_fault": false,
-    "last_update": "2025-10-22T15:27:17.615500",
-    "config": {
-      "battery": 100,
-      "maxSpeed": 2,
-      "orientation": 0,
-      "initialPosition": "10584"
-    }
-  },
-  {
-    "id": "f18cc6e9-5ffc-4f9d-b8db-9c6b0fe16151",
+    "id": "987383e9-7088-4312-b25d-ed43013327e4",
     "serialNumber": "AMB-01",
     "manufacturer": "SEER",
     "type": "AGV",
-    "ip": "192.168.9.1",
-    "status": "offline",
-    "position": {
-      "x": -2.599,
-      "y": -5.779,
-      "rotate": 0
-    },
-    "battery": 100.0,
-    "maxSpeed": 2.0,
-    "gid": "default",
-    "is_warning": false,
-    "is_fault": false,
-    "last_update": null,
-    "config": {
-      "battery": 100,
-      "maxSpeed": 2,
-      "orientation": 0,
-      "initialPosition": "10585"
-    }
+    "ip": "192.168.9.1"
+  },
+  {
+    "id": "88798196-6b9a-4899-8bf1-286be6a97252",
+    "serialNumber": "AMB-02",
+    "manufacturer": "SEER",
+    "type": "AGV",
+    "ip": "192.168.9.2"
   }
 ]

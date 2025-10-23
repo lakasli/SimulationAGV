@@ -13,26 +13,32 @@ from .async_mqtt_client import VDA5050AsyncMqttClient
 from .redis_manager import StateCache, RedisConnectionManager
 from ..vda5050.state import State
 
-
-@dataclass
-class RobotStatus:
-    """机器人状态摘要"""
-    robot_id: str
-    manufacturer: str
-    serial_number: str
-    last_update: datetime
-    battery_level: float
-    operating_mode: str
-    safety_state: str
-    position: Dict[str, Any]
-    is_online: bool
-    errors: List[Dict[str, Any]]
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典格式"""
-        data = asdict(self)
-        data['last_update'] = self.last_update.isoformat()
-        return data
+# 尝试使用共享模型，如果失败则使用本地定义
+try:
+    from shared import RobotStatus as SharedRobotStatus
+    # 使用共享模型
+    RobotStatus = SharedRobotStatus
+except ImportError:
+    # 如果共享模块不可用，保留原始定义
+    @dataclass
+    class RobotStatus:
+        """机器人状态摘要"""
+        robot_id: str
+        manufacturer: str
+        serial_number: str
+        last_update: datetime
+        battery_level: float
+        operating_mode: str
+        safety_state: str
+        position: Dict[str, Any]
+        is_online: bool
+        errors: List[Dict[str, Any]]
+        
+        def to_dict(self) -> Dict[str, Any]:
+            """转换为字典格式"""
+            data = asdict(self)
+            data['last_update'] = self.last_update.isoformat()
+            return data
 
 
 class StateMonitorService:

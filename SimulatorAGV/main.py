@@ -6,10 +6,14 @@ import os
 import argparse
 
 # 添加项目根目录到Python路径
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)  # 获取项目根目录
+sys.path.insert(0, project_root)  # 添加到路径开头
 
 from core.instance_manager import InstanceManager
-from logger_config import logger
+from shared import setup_logger
+
+logger = setup_logger()
 from api import start_api_server, register_all_routes
 
 
@@ -45,6 +49,12 @@ def main():
         registry_path = os.path.join(current_dir, args.registry)
     else:
         registry_path = args.registry
+    
+    # 添加调试信息
+    logger.info(f"Debug: args.registry = '{args.registry}'")
+    logger.info(f"Debug: current_dir = '{current_dir}'")
+    logger.info(f"Debug: registry_path = '{registry_path}'")
+    logger.info(f"Debug: registry_path exists = {os.path.exists(registry_path)}")
     
     try:
         # 创建实例管理器

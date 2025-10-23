@@ -10,7 +10,9 @@ from vda5050.visualization import Visualization
 from vda5050.order import Order
 from vda5050.instant_actions import InstantActions
 from utils import get_timestamp, get_distance
-from logger_config import logger
+from shared import setup_logger
+
+logger = setup_logger()
 
 
 class AgvSimulator:
@@ -56,10 +58,19 @@ class AgvSimulator:
             serial_number=self.config['vehicle']['serial_number']
         )
         
-        # 生成随机初始位置
-        random_x, random_y = self._generate_random_position()
-        state.agv_position = AgvPosition(x=random_x, y=random_y, map_id=self.config['settings']['map_id'])
-        state.agv_position.position_initialized = False
+        # 使用配置中的初始位置，如果没有则使用随机位置
+        if 'initial_x' in self.config['settings'] and 'initial_y' in self.config['settings']:
+            initial_x = self.config['settings']['initial_x']
+            initial_y = self.config['settings']['initial_y']
+            initial_theta = self.config['settings'].get('initial_theta', 0)
+            logger.info(f"Using configured initial position: x={initial_x}, y={initial_y}, theta={initial_theta}")
+        else:
+            initial_x, initial_y = 0.0 , 0.0
+            initial_theta = 0.0
+            logger.info(f"Using (0.0,0.0,0.0) initial position: x={initial_x}, y={initial_y}, theta={initial_theta}")
+        
+        state.agv_position = AgvPosition(x=initial_x, y=initial_y, theta=initial_theta, map_id=self.config['settings']['map_id'])
+        state.agv_position.position_initialized = True  # 设置为True，因为我们有明确的初始位置
         
         # 设置电池状态
         state.battery_state.battery_charge = 100.0
@@ -76,12 +87,6 @@ class AgvSimulator:
         if self.state.agv_position:
             visualization.agv_position = self.state.agv_position
         return visualization
-
-    def _generate_random_position(self, min_val: float = -2.5, max_val: float = 2.5) -> tuple:
-        """生成随机位置"""
-        x = random.uniform(min_val, max_val)
-        y = random.uniform(min_val, max_val)
-        return x, y
 
     def update_state(self):
         """更新AGV状态"""

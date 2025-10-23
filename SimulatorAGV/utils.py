@@ -1,7 +1,17 @@
 import json
 import random
+import sys
+import os
 from datetime import datetime, timezone
 from typing import Dict, Any
+
+# 添加项目根目录到Python路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+from shared import get_config
 
 
 def get_timestamp() -> str:
@@ -10,9 +20,17 @@ def get_timestamp() -> str:
 
 
 def load_config(config_path: str = "config.json") -> Dict[str, Any]:
-    """加载配置文件"""
-    with open(config_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+    """
+    加载配置文件 (已弃用，建议使用 shared.get_config())
+    """
+    # 为了向后兼容，保留此函数，但建议使用新的配置管理
+    try:
+        from shared import AppConfig
+        return AppConfig.from_file(config_path).to_dict()
+    except Exception:
+        # 回退到原始实现
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
 
 
 def generate_vda_mqtt_base_topic(vda_interface: str, vda_version: str, manufacturer: str, serial_number: str) -> str:

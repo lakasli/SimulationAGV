@@ -521,12 +521,11 @@
                         <option value="AGV">AGV</option>
                         <option value="AMR">AMR</option>
                         <option value="Forklift">叉车</option>
-                        <option value="Conveyor">输送机器人</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label class="form-label">机器人IP地址</label>
-                    <input type="text" class="form-input" id="configRobotIP" placeholder="192.168.1.100">
+                    <input type="text" class="form-input" id="configRobotIP" placeholder="XXX.XXX.XXX.XXX">
                 </div>
                 <div class="form-group">
                     <label class="form-label">厂商</label>
@@ -548,11 +547,11 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">最大速度 (m/s)</label>
-                    <input type="number" class="form-input" id="configMaxSpeed" value="2.0" step="0.1" min="0.1" max="10.0">
+                    <input type="number" class="form-input" id="configMaxSpeed" value="2.0" min="0.1" max="2.0">
                 </div>
                 <div class="form-group">
                     <label class="form-label">朝向 (弧度)</label>
-                    <input type="number" class="form-input" id="configOrientation" value="0" step="0.1" min="-6.28" max="6.28">
+                    <input type="number" class="form-input" id="configOrientation" value="0" min="-1.57" max="1.57">
                 </div>
                 <button class="btn-primary" onclick="saveConfig()">保存配置</button>
             </div>
@@ -591,12 +590,11 @@
                             <option value="AGV">AGV</option>
                             <option value="AMR">AMR</option>
                             <option value="Forklift">叉车</option>
-                            <option value="Conveyor">输送机器人</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label">机器人IP地址</label>
-                        <input type="text" class="form-input" id="robotIP" placeholder="192.168.1.100">
+                        <input type="text" class="form-input" id="robotIP" placeholder="XXX.XXX.XXX.XXX">
                     </div>
                     <div class="form-group">
                         <label class="form-label">厂商</label>
@@ -1432,6 +1430,14 @@
                     
                     updateRobotOnServer(currentConfigRobotId, updateData);
                     
+                    // 传输初始位置坐标给仿真机器人实例
+                    if (robot.initialPosition && typeof robot.initialPosition === 'object') {
+                        // 异步设置机器人初始位置
+                        (async () => {
+                            await sendInitialPositionToRobot(currentConfigRobotId, robot.initialPosition);
+                        })();
+                    }
+                    
                     updateRobotList();
                 
                 // 重新绘制地图以显示机器人位置
@@ -1632,17 +1638,17 @@
                 ip: robotIP,
                 status: "offline",
                 position: initialPos ? { x: initialPos.x, y: initialPos.y, rotate: robotConfig.orientation } : { x: 0, y: 0, rotate: 0 },
-                battery: robotConfig.battery,
-                maxSpeed: robotConfig.maxSpeed,
-                gid: "default",
-                is_warning: false,
-                is_fault: false,
-                config: {
-                    battery: robotConfig.battery,
-                    maxSpeed: robotConfig.maxSpeed,
-                    orientation: robotConfig.orientation,
-                    initialPosition: initialPos ? initialPos.id : null
-                }
+                // battery: robotConfig.battery,
+                // maxSpeed: robotConfig.maxSpeed,
+                // gid: "default",
+                // is_warning: false,
+                // is_fault: false,
+                // config: {
+                //     battery: robotConfig.battery,
+                //     maxSpeed: robotConfig.maxSpeed,
+                //     orientation: robotConfig.orientation,
+                //     initialPosition: initialPos ? initialPos.id : null
+                // }
             };
             
             try {
@@ -1678,6 +1684,11 @@
                 if (result.success) {
                     // 注册成功，重新加载机器人列表
                     await loadRobotList();
+                    
+                    // 传输初始位置坐标给仿真机器人实例
+                    if (initialPos && result.robot_id) {
+                        await sendInitialPositionToRobot(result.robot_id, initialPos);
+                    }
                     
                     // 清空表单
                     clearRobotForm();
@@ -1723,15 +1734,18 @@
                     type: robot.type,
                     ip: robot.ip,
                     manufacturer: robot.manufacturer,
+                    // 实时数据从后端API获取（已经包含了实例状态）
                     battery: robot.battery,
                     maxSpeed: robot.maxSpeed,
-                    orientation: robot.config?.orientation || 0,
                     status: robot.status,
                     currentPosition: robot.position ? {
                         x: robot.position.x,
                         y: robot.position.y,
                         orientation: robot.position.rotate
                     } : null,
+                    is_warning: robot.is_warning,
+                    is_fault: robot.is_fault,
+                    last_update: robot.last_update,
                     registeredAt: robot.properties?.registeredAt ? 
                         new Date(robot.properties.registeredAt).toLocaleString() : 
                         '未知',
@@ -1758,6 +1772,72 @@
             document.getElementById('initialPosition').value = '';
         }
         
+        // 向仿真机器人实例传输初始位置坐标
+        async function sendInitialPositionToRobot(robotId, positionData) {
+            try {
+                // 获取机器人配置中的朝向
+                const robot = registeredRobots.find(r => r.id === robotId);
+                const orientation = robot ? (robot.orientation || 0) : 0;
+                
+                // 构造位置数据
+                const positionPayload = {
+                    x: positionData.x,
+                    y: positionData.y,
+                    rotate: orientation
+                };
+                
+                // 发送到后端API设置机器人初始位置
+                const response = await loggedFetch(`${API_BASE_URL}/robots/${robotId}/config`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        position: positionPayload,
+                        initialPosition: positionData.id
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success) {
+                        console.log(`成功设置机器人 ${robotId} 的初始位置:`, positionPayload);
+                        document.getElementById('status').textContent = '初始位置设置成功';
+                        
+                        // 重置前端初始位置选项
+                        resetInitialPositionSelections();
+                        
+                        setTimeout(() => {
+                            document.getElementById('status').textContent = '准备就绪';
+                        }, 2000);
+                    } else {
+                        throw new Error(result.message || '设置初始位置失败');
+                    }
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+            } catch (error) {
+                console.error('设置机器人初始位置失败:', error);
+                document.getElementById('status').textContent = '设置初始位置失败: ' + error.message;
+            }
+        }
+        
+        // 重置前端初始位置选项
+        function resetInitialPositionSelections() {
+            // 重置注册机器人表单中的初始位置选择
+            const registerInitialPosition = document.getElementById('initialPosition');
+            if (registerInitialPosition) {
+                registerInitialPosition.value = '';
+            }
+            
+            // 重置配置模态框中的初始位置选择
+            const configInitialPosition = document.getElementById('configInitialPosition');
+            if (configInitialPosition) {
+                configInitialPosition.value = '';
+            }
+        }
+        
         function updateRobotList() {
             const container = document.getElementById('robotListContainer');
             
@@ -1773,11 +1853,16 @@
                 const instanceStatusText = isInstanceRunning ? '运行中' : '已停止';
                 const instanceStatusColor = isInstanceRunning ? '#27ae60' : '#e74c3c';
                 
-                // 获取机器人在线状态
+                // 获取机器人在线状态（从实时数据）
                 const robotOnlineStatus = robot.status || 'offline';
                 const isOnline = robotOnlineStatus === 'online';
                 const onlineStatusText = isOnline ? '在线' : '离线';
                 const onlineStatusColor = isOnline ? '#27ae60' : '#e74c3c';
+                
+                // 获取机器人状态（从实时数据）
+                const hasWarning = robot.is_warning || false;
+                const hasError = robot.is_fault || false;
+                const batteryLevel = robot.battery || 0;
                 
                 return `
                     <div class="robot-item">
@@ -1786,12 +1871,12 @@
                         </div>
                         <div class="robot-info">
                             类型: ${robot.type} | IP: ${robot.ip}<br>
-                            厂商: ${robot.manufacturer || '未知'} | 电量: ${robot.battery}% <br>
+                            厂商: ${robot.manufacturer || '未知'} | 电量: ${batteryLevel}% <br>
                             ${robot.currentPosition && robot.currentPosition.x !== undefined && robot.currentPosition.y !== undefined ? 
                                 `当前位置: (${robot.currentPosition.x.toFixed(2)}, ${robot.currentPosition.y.toFixed(2)}) | 方向: ${robot.currentPosition.orientation || 0}°` : 
                                 '位置未知'}<br>
-                            ${robot.hasWarning || robot.hasError ? 
-                                `<span style="color: ${robot.hasError ? '#e74c3c' : '#f39c12'}; font-weight: bold;">状态: ${robot.hasError ? '错误' : '警告'}</span><br>` : 
+                            ${hasWarning || hasError ? 
+                                `<span style="color: ${hasError ? '#e74c3c' : '#f39c12'}; font-weight: bold;">状态: ${hasError ? '错误' : '警告'}</span><br>` : 
                                 '<span style="color: #27ae60; font-weight: bold;">状态: 正常</span><br>'
                             }
                             <span style="color: #9b59b6; font-weight: bold;">任务状态: ${robot.taskId ? `任务ID: ${robot.taskId}` : '无任务'}</span><br>

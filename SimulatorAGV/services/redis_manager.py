@@ -5,7 +5,9 @@ import logging
 from typing import Dict, Any, Optional, List, Union
 from datetime import datetime, timedelta
 import aioredis
-from logger_config import logger
+from shared import setup_logger
+
+logger = setup_logger()
 
 
 class RedisManager:

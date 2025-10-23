@@ -16,7 +16,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.robot_factory import RobotFactory
 from instances.robot_instance import RobotInstance
-from logger_config import logger
+from shared import setup_logger
+
+logger = setup_logger()
 
 
 class StatusAPIHandler(BaseHTTPRequestHandler):
@@ -81,11 +83,23 @@ class InstanceManager:
         初始化实例管理器
         
         Args:
-            base_config_path: 基础配置文件路径
+            base_config_path: 基础配置文件路径 (已弃用，建议使用共享配置)
             registry_path: 机器人注册文件路径
         """
+        logger.info(f"Debug InstanceManager init: base_config_path='{base_config_path}', registry_path='{registry_path}'")
+        
         self.robots: Dict[str, RobotInstance] = {}
-        self.robot_factory = RobotFactory(base_config_path)
+        
+        # 尝试使用新的配置管理，如果失败则回退到原始方式
+        try:
+            from shared import get_config
+            self.config = get_config()
+            self.robot_factory = RobotFactory()  # 使用默认配置
+        except Exception:
+            # 回退到原始实现
+            self.robot_factory = RobotFactory(base_config_path)
+            self.config = None
+            
         self._lock = threading.Lock()
         self._running = False
         self._monitor_thread = None
@@ -514,8 +528,17 @@ class InstanceManager:
 
     def _start_file_monitoring(self):
         """启动文件监控"""
-        if not self.registry_path or not os.path.exists(self.registry_path):
-            logger.warning("注册文件路径无效，跳过文件监控")
+        logger.info(f"Debug: registry_path = '{self.registry_path}'")
+        logger.info(f"Debug: registry_path exists = {os.path.exists(self.registry_path) if self.registry_path else False}")
+        
+        # 检查registry_path是否为None或空字符串
+        if not self.registry_path:
+            logger.warning("注册文件路径为空，跳过文件监控")
+            return
+            
+        # 检查文件是否存在
+        if not os.path.exists(self.registry_path):
+            logger.warning(f"注册文件不存在: {self.registry_path}，跳过文件监控")
             return
         
         try:

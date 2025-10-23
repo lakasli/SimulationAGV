@@ -40,7 +40,13 @@ def get_global_instance_manager():
     with _global_manager_lock:
         if _global_instance_manager is None and InstanceManager is not None:
             try:
-                _global_instance_manager = InstanceManager()
+                # 获取正确的配置和注册文件路径
+                current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+                simulator_agv_dir = os.path.join(current_dir, 'SimulatorAGV')
+                config_path = os.path.join(simulator_agv_dir, 'config.json')
+                registry_path = os.path.join(simulator_agv_dir, 'registered_robots.json')
+                
+                _global_instance_manager = InstanceManager(config_path, registry_path)
                 # 启动全局实例管理器
                 _global_instance_manager.start_all()
                 logger.info("全局实例管理器初始化并启动成功")

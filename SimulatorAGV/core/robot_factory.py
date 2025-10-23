@@ -7,7 +7,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from instances.robot_instance import RobotInstance
 from core.config_generator import ConfigGenerator
-from logger_config import logger
+from shared import setup_logger
+
+logger = setup_logger()
 
 
 class RobotFactory:
@@ -18,9 +20,18 @@ class RobotFactory:
         初始化机器人工厂
         
         Args:
-            base_config_path: 基础配置文件路径
+            base_config_path: 基础配置文件路径 (已弃用，建议使用共享配置)
         """
-        self.config_generator = ConfigGenerator(base_config_path)
+        # 尝试使用新的配置管理，如果失败则回退到原始方式
+        try:
+            from shared import get_config
+            self.config = get_config()
+            self.config_generator = ConfigGenerator()  # 使用默认配置
+        except Exception:
+            # 回退到原始实现
+            self.config_generator = ConfigGenerator(base_config_path)
+            self.config = None
+            
         logger.info("机器人工厂初始化完成")
     
     def create_robot_instance(self, robot_info: Dict[str, Any]) -> Optional[RobotInstance]:
@@ -116,7 +127,7 @@ class RobotFactory:
         Returns:
             验证结果
         """
-        required_fields = ["id", "serialNumber", "manufacturer"]
+        required_fields = ["id", "serialNumber", "manufacturer", "type", "ip"]
         
         for field in required_fields:
             if field not in robot_info:
@@ -128,6 +139,17 @@ class RobotFactory:
         if not serial_number or len(serial_number.strip()) == 0:
             logger.error("机器人序列号不能为空")
             return False
+        
+        # 验证IP地址格式
+        ip = robot_info.get("ip")
+        if not ip or len(ip.strip()) == 0:
+            logger.error("机器人IP地址不能为空")
+            return False
+        
+        # 验证机器人类型
+        robot_type = robot_info.get("type")
+        if robot_type not in ["AGV", "AMR"]:
+            logger.warning(f"机器人类型 '{robot_type}' 不在标准类型列表中")
         
         return True
     
@@ -155,24 +177,7 @@ class RobotFactory:
             "serialNumber": serial_number,
             "manufacturer": "SimulatorAGV",
             "type": "AMR",
-            "ip": "192.168.1.100",
-            "status": "offline",
-            "position": {
-                "x": 0.0,
-                "y": 0.0,
-                "rotate": 0
-            },
-            "battery": 100.0,
-            "maxSpeed": 2.0,
-            "gid": "default",
-            "is_warning": False,
-            "is_fault": False,
-            "config": {
-                "battery": 100,
-                "maxSpeed": 2,
-                "orientation": 0,
-                "initialPosition": "0"
-            }
+            "ip": "192.168.1.100"
         }
     
     def update_base_config(self, new_config: Dict[str, Any]):

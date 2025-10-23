@@ -1,24 +1,70 @@
-"""API注册中心
-统一管理和注册所有API路由
+"""
+API注册表 - 统一实现
+使用共享HTTP服务器基类的现代化API注册表
+
+建议使用 unified_api_server.py 中的 UnifiedAPIServer
+此文件提供向后兼容的接口
 """
 
+import re
 import json
 import threading
-import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from typing import Dict, List, Callable, Optional, Any
 from urllib.parse import urlparse, parse_qs
-from typing import Dict, Any, Optional, Callable, List, Tuple
-import traceback
-import sys
-import os
-import re
-from datetime import datetime
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from dataclasses import is_dataclass
+from datetime import datetime
 
-# 添加项目根目录到Python路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 尝试导入共享模块
+try:
+    from shared import setup_logger
+    logger = setup_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
-from logger_config import logger
+# 导入统一API服务器实现
+try:
+    from .unified_api_server import (
+        UnifiedAPIServer, APIRegistry, APIRoute,
+        get_api_server as get_unified_server,
+        start_api_server as start_unified_server,
+        stop_api_server as stop_unified_server,
+        register_route,
+        get, post, put, delete
+    )
+    
+    # 为了向后兼容，创建别名
+    APIServer = UnifiedAPIServer
+    get_api_server = get_unified_server
+    start_api_server = start_unified_server
+    stop_api_server = stop_unified_server
+    
+    # 导出所有需要的符号
+    __all__ = [
+        'APIRegistry', 'APIRoute', 'APIServer', 'UnifiedAPIServer',
+        'get_api_server', 'start_api_server', 'stop_api_server',
+        'register_route', 'get', 'post', 'put', 'delete'
+    ]
+    
+except ImportError:
+    # 如果统一服务器不可用，回退到传统实现
+    from .legacy_registry import (
+        APIRegistry, APIRoute, APIServer,
+        get_api_server, start_api_server, stop_api_server,
+        get, post, put, delete
+    )
+    
+    def register_route(method: str, path: str, handler, description: str = ""):
+        """注册路由到全局服务器"""
+        server = get_api_server()
+        server.registry.register(method, path, handler, description)
+    
+    __all__ = [
+        'APIRegistry', 'APIRoute', 'APIServer',
+        'get_api_server', 'start_api_server', 'stop_api_server',
+        'register_route', 'get', 'post', 'put', 'delete'
+    ]
 
 
 class APIRoute:

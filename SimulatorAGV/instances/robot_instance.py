@@ -12,7 +12,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agv_simulator import AgvSimulator
 from mqtt_client import MqttClient
 from vda5050.connection import Connection
-from logger_config import logger
+from shared import setup_logger
+
+logger = setup_logger()
 
 
 class RobotInstance:
@@ -260,3 +262,53 @@ class RobotInstance:
     def get_manufacturer(self) -> str:
         """获取机器人制造商"""
         return self.config["vehicle"]["manufacturer"]
+    
+    def update_config(self, config_data: Dict[str, Any]) -> bool:
+        """更新机器人配置"""
+        try:
+            # 处理位置初始化
+            if 'position' in config_data:
+                position_data = config_data['position']
+                x = position_data.get('x', 0.0)
+                y = position_data.get('y', 0.0)
+                theta = position_data.get('rotate', 0.0)
+                
+                # 更新AGV模拟器的位置
+                with self._lock:
+                    if self.agv_simulator.state.agv_position:
+                        self.agv_simulator.state.agv_position.x = x
+                        self.agv_simulator.state.agv_position.y = y
+                        self.agv_simulator.state.agv_position.theta = theta
+                        self.agv_simulator.state.agv_position.position_initialized = True
+                    else:
+                        from vda5050.state import AgvPosition
+                        self.agv_simulator.state.agv_position = AgvPosition(
+                            x=x, y=y, theta=theta, 
+                            map_id=self.config['settings']['map_id'],
+                            position_initialized=True
+                        )
+                    
+                    # 同步更新可视化位置
+                    if self.agv_simulator.visualization.agv_position:
+                        self.agv_simulator.visualization.agv_position.x = x
+                        self.agv_simulator.visualization.agv_position.y = y
+                        self.agv_simulator.visualization.agv_position.theta = theta
+                    else:
+                        self.agv_simulator.visualization.agv_position = self.agv_simulator.state.agv_position
+                    
+                    # 立即发布更新后的状态和可视化消息
+                    self._publish_state_message()
+                    self._publish_visualization_message()
+                
+                logger.info(f"机器人 {self.robot_id} 位置已更新并发布MQTT消息: x={x}, y={y}, theta={theta}")
+            
+            # 处理其他配置更新
+            if 'initialPosition' in config_data:
+                # 这里可以处理初始位置ID的存储
+                logger.info(f"机器人 {self.robot_id} 初始位置ID: {config_data['initialPosition']}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"更新机器人 {self.robot_id} 配置失败: {e}")
+            return False

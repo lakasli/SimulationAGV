@@ -20,7 +20,9 @@ from services.robot_service import RobotService
 from services.point_service import PointService
 from services.route_service import RouteService
 from services.area_service import AreaService
-from logger_config import logger
+from shared import setup_logger
+
+logger = setup_logger()
 
 
 class EditorService:
@@ -172,10 +174,8 @@ class EditorService:
                     if isinstance(group_data, dict):
                         group_dict = {
                             'id': group_data.get('id', ''),
-                            'label': group_data.get('label', ''),
-                            'robots': group_data.get('robots', []),
-                            'config': group_data.get('config'),
-                            'properties': group_data.get('properties')
+                            'name': group_data.get('label', ''),  # 修复：使用name而不是label
+                            'robots': group_data.get('robots', [])
                         }
                         groups.append(RobotGroup(**group_dict))
                     elif isinstance(group_data, RobotGroup):

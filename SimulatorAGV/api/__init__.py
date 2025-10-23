@@ -7,6 +7,7 @@ from .registry import APIRegistry, start_api_server, stop_api_server, get_api_se
 from .robot_routes import register_robot_routes
 from .order_routes import register_order_routes
 from .system_routes import register_system_routes
+from .map_routes import register_map_routes
 
 
 def register_all_routes(instance_manager):
@@ -14,6 +15,7 @@ def register_all_routes(instance_manager):
     register_robot_routes(instance_manager)
     register_order_routes(instance_manager)
     register_system_routes(instance_manager)
+    register_map_routes(instance_manager)
 
 
 __all__ = [

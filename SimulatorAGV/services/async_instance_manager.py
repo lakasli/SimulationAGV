@@ -19,7 +19,9 @@ from .redis_manager import StateCache, RedisConnectionManager
 from core.instance_manager import InstanceManager
 from core.robot_factory import RobotFactory
 from instances.robot_instance import RobotInstance
-from logger_config import logger
+from shared import setup_logger
+
+logger = setup_logger()
 
 
 class AsyncInstanceManager:
@@ -279,7 +281,7 @@ class AsyncInstanceManager:
     async def get_robots_by_criteria(self, 
                                    operating_mode: Optional[str] = None,
                                    safety_state: Optional[str] = None,
-                                   min_battery: Optional[float] = None) -> List[RobotStatus]:
+                                   min_battery: Optional[float] = None) -> List:
         """
         根据条件筛选机器人
         
@@ -386,7 +388,7 @@ class AsyncInstanceManager:
                 
         self.logger.info(f"任务处理器 {processor_name} 已停止")
         
-    async def _on_robot_state_change(self, robot_id: str, status: RobotStatus):
+    async def _on_robot_state_change(self, robot_id: str, status: Any):
         """处理机器人状态变化"""
         self.logger.debug(f"机器人 {robot_id} 状态变化: {status.operating_mode}")
         

@@ -3,7 +3,9 @@ import json
 from typing import Dict, Any, Callable, Optional, List
 from contextlib import asynccontextmanager
 import asyncio_mqtt as aiomqtt
-from logger_config import logger
+from shared import setup_logger
+
+logger = setup_logger()
 
 
 class AsyncMqttClient:

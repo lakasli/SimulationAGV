@@ -2,6 +2,14 @@ import json
 from typing import List, Optional
 from dataclasses import dataclass, field
 
+# 尝试使用共享序列化工具
+try:
+    from shared import SerializationMixin, to_json, from_json
+    _use_shared_serialization = True
+except ImportError:
+    _use_shared_serialization = False
+
+
 @dataclass
 class ActionParameter:
     key: str = ""
@@ -225,7 +233,10 @@ class Order:
         return result
     
     def to_json(self):
-        return json.dumps(self.to_dict(), indent=2)
+        if _use_shared_serialization:
+            return to_json(self, indent=2)
+        else:
+            return json.dumps(self.to_dict(), indent=2)
     
     @classmethod
     def from_dict(cls, data: dict):

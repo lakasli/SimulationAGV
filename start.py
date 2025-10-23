@@ -163,8 +163,12 @@ def start_agv_simulator():
             logger.error(f"错误: AGV仿真器脚本不存在: {simulator_script}")
             return False
         
-        # 启动AGV仿真器
-        process = subprocess.Popen([sys.executable, str(simulator_script)])
+        # 启动AGV仿真器，指定正确的注册文件路径
+        process = subprocess.Popen([
+            sys.executable, 
+            str(simulator_script),
+            "--registry", "registered_robots.json"  # 指定正确的注册文件名
+        ])
         processes.append(process)
         return True
         

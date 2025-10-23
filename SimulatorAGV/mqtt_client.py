@@ -5,7 +5,9 @@ import time
 
 from vda5050.order import Order
 from vda5050.instant_actions import InstantActions
-from logger_config import logger
+from shared import setup_logger
+
+logger = setup_logger()
 
 
 class MqttClient:

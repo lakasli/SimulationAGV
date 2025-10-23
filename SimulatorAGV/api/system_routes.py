@@ -6,7 +6,9 @@ import json
 import os
 from typing import Dict, Any
 from .registry import get_api_server
-from logger_config import logger
+from shared import setup_logger
+
+logger = setup_logger()
 
 
 def register_system_routes(instance_manager):

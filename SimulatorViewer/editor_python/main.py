@@ -8,12 +8,16 @@ import argparse
 import signal
 from typing import Optional
 
-# 添加当前目录到Python路径
+# 添加当前目录和项目根目录到Python路径
 current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(os.path.dirname(current_dir))  # 获取项目根目录
 sys.path.insert(0, current_dir)
+sys.path.insert(0, project_root)  # 添加项目根目录以访问shared模块
 
 from api.web_api import start_api_server, stop_api_server, get_api_server
-from logger_config import logger
+from shared import setup_logger
+
+logger = setup_logger()
 
 
 def signal_handler(signum, frame):
