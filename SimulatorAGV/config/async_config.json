@@ -1,92 +1,31 @@
 {
-  "async_architecture": {
-    "mqtt": {
-      "broker": "localhost",
-      "port": 1883,
-      "keepalive": 60,
-      "client_id_prefix": "async_agv_",
-      "qos": 1,
-      "retain": false,
-      "topics": {
-        "state_pattern": "uagv/+/+/state",
-        "order_pattern": "uagv/+/+/order",
-        "instant_action_pattern": "uagv/+/+/instantActions",
-        "connection_pattern": "uagv/+/+/connection",
-        "visualization_pattern": "uagv/+/+/visualization"
-      }
-    },
-    "redis": {
-      "url": "redis://localhost:6379",
-      "db": 0,
-      "decode_responses": true,
-      "socket_timeout": 5,
-      "socket_connect_timeout": 5,
-      "retry_on_timeout": true,
-      "health_check_interval": 30,
-      "keys": {
-        "robot_state_prefix": "robot:state:",
-        "robot_config_prefix": "robot:config:",
-        "robot_order_prefix": "robot:order:",
-        "robot_history_prefix": "robot:history:",
-        "active_robots_set": "active_robots",
-        "cache_stats_key": "cache:stats"
-      },
-      "expiration": {
-        "state_ttl": 300,
-        "config_ttl": 3600,
-        "order_ttl": 1800,
-        "history_ttl": 86400
-      }
-    },
-    "state_monitor": {
-      "state_timeout": 30,
-      "cleanup_interval": 300,
-      "monitor_interval": 10,
-      "max_history_entries": 1000,
-      "batch_size": 100
-    },
-    "task_processing": {
-      "queue_size": 1000,
-      "processor_count": 3,
-      "task_timeout": 300,
-      "retry_attempts": 3,
-      "retry_delay": 5
-    },
-    "decision_engine": {
-      "min_battery_level": 20.0,
-      "critical_battery_level": 10.0,
-      "idle_timeout": 600,
-      "error_retry_limit": 3,
-      "offline_timeout": 60
-    },
-    "logging": {
-      "level": "INFO",
-      "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-      "file": "logs/async_architecture.log",
-      "max_bytes": 10485760,
-      "backup_count": 5
-    },
-    "performance": {
-      "connection_pool_size": 10,
-      "max_concurrent_operations": 50,
-      "batch_processing": true,
-      "cache_warming": true,
-      "metrics_collection": true
-    }
+  "mqtt": {
+    "broker": "localhost",
+    "port": 1883,
+    "username": null,
+    "password": null,
+    "client_id_prefix": "agv_simulator",
+    "keepalive": 60,
+    "qos": 0,
+    "retain": false,
+    "topic_prefix": "uagv/v1"
   },
-  "robot_defaults": {
-    "manufacturer": "DefaultMfg",
-    "max_speed": 2.0,
-    "battery_capacity": 100.0,
-    "charging_threshold": 20.0,
-    "emergency_stop_timeout": 5.0,
-    "navigation_precision": 0.1
+  "log": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
+    "file_path": null,
+    "max_file_size": 10485760,
+    "backup_count": 5
   },
-  "integration": {
-    "sync_manager_compatibility": true,
-    "api_server_port": 8003,
-    "health_check_endpoint": "/health",
-    "metrics_endpoint": "/metrics",
-    "status_endpoint": "/status"
+  "server": {
+    "host": "localhost",
+    "port": 8000,
+    "debug": false,
+    "cors_origins": ["*"]
+  },
+  "storage": {
+    "base_path": "robot_data",
+    "max_history_entries": 100,
+    "auto_cleanup_days": 30
   }
 }

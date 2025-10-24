@@ -1,0 +1,33 @@
+{
+  "headerId": 35,
+  "timestamp": "2025-10-24T17:50:31.468942",
+  "version": "2.0.0",
+  "manufacturer": "SEER",
+  "serialNumber": "AMB-01",
+  "orderId": "",
+  "orderUpdateId": 0,
+  "lastNodeId": "",
+  "lastNodeSequenceId": 0,
+  "driving": false,
+  "paused": false,
+  "operatingMode": "AUTOMATIC",
+  "batteryState": {
+    "batteryCharge": 100.0,
+    "batteryVoltage": null,
+    "batteryHealth": null
+  },
+  "safetyState": {
+    "eStop": null,
+    "fieldViolation": false
+  },
+  "agvPosition": {
+    "x": -3.997,
+    "y": -6.979,
+    "theta": 0,
+    "mapId": "default",
+    "mapDescription": "",
+    "positionInitialized": true,
+    "localizationScore": 0.0,
+    "deviationRange": 0.0
+  }
+}

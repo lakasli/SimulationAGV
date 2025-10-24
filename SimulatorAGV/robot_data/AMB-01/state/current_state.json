@@ -1,6 +1,6 @@
 {
-  "headerId": 119,
-  "timestamp": "2025-10-23T02:56:18.580Z",
+  "headerId": 102,
+  "timestamp": "2025-10-24T14:14:07.197779",
   "version": "2.0.0",
   "manufacturer": "SEER",
   "serialNumber": "AMB-01",
@@ -12,7 +12,7 @@
   "paused": false,
   "operatingMode": "AUTOMATIC",
   "batteryState": {
-    "batteryCharge": 100,
+    "batteryCharge": 100.0,
     "batteryVoltage": null,
     "batteryHealth": null
   },
@@ -21,13 +21,13 @@
     "fieldViolation": false
   },
   "agvPosition": {
-    "x": 0,
-    "y": 0,
-    "theta": 0,
+    "x": 0.0,
+    "y": 0.0,
+    "theta": 0.0,
     "mapId": "default",
     "mapDescription": "",
     "positionInitialized": true,
-    "localizationScore": 0,
-    "deviationRange": 0
+    "localizationScore": 0.0,
+    "deviationRange": 0.0
   }
 }

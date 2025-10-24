@@ -15,8 +15,8 @@ from datetime import datetime
 import logging
 
 # 添加SimulatorAGV路径到系统路径
-simulator_agv_parent_path = os.path.join(os.path.dirname(__file__), '..', '..', '..')
-sys.path.append(os.path.abspath(simulator_agv_parent_path))
+project_root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+sys.path.append(project_root_path)
 
 try:
     # 尝试从 SimulatorAGV 的 core 模块导入 InstanceManager，若失败则留空
@@ -63,7 +63,9 @@ class RobotInstanceService:
         self.running_instances: Dict[str, Dict[str, Any]] = {}
         self.instance_processes: Dict[str, subprocess.Popen] = {}
         self._lock = threading.Lock()
-        self.backend_api_url = "http://localhost:8002/api/status"  # 后端API地址
+        
+        # 后端API配置
+        self.backend_api_url = "http://localhost:8002/api/status"
         
         # 使用全局实例管理器
         self.use_internal_manager = InstanceManager is not None
@@ -178,6 +180,10 @@ class RobotInstanceService:
             response = requests.get(self.backend_api_url, timeout=2)
             if response.status_code == 200:
                 backend_status = response.json()
+                # 校验后端返回格式，必须包含 'robots'
+                if not isinstance(backend_status, dict) or "robots" not in backend_status:
+                    logger.warning(f"后端状态格式不符合预期，触发回退: {backend_status}")
+                    raise ValueError("Unsupported backend status schema")
                 
                 # 转换后端状态格式为前端格式
                 if robot_id:
@@ -204,7 +210,7 @@ class RobotInstanceService:
                         "instances": instances
                     }
         except Exception as e:
-            logger.warning(f"无法连接到后端API: {e}")
+            logger.warning(f"无法连接到后端API或返回异常: {e}")
         
         # 回退到内置管理器
         if self.use_internal_manager and self.instance_manager:
@@ -274,7 +280,7 @@ class RobotInstanceService:
             success = self.instance_manager.add_robot(robot_info)
             if success:
                 # 启动机器人
-                return self.instance_manager.start_robot(robot_info['id'])
+                return self.instance_manager.start_robot(robot_info.get('serialNumber', robot_info['id']))
             return False
         except Exception as e:
             logger.error(f"内置管理器启动机器人失败: {e}")

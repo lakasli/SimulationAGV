@@ -58,19 +58,39 @@ class AgvSimulator:
             serial_number=self.config['vehicle']['serial_number']
         )
         
-        # 使用配置中的初始位置，如果没有则使用随机位置
-        if 'initial_x' in self.config['settings'] and 'initial_y' in self.config['settings']:
-            initial_x = self.config['settings']['initial_x']
-            initial_y = self.config['settings']['initial_y']
-            initial_theta = self.config['settings'].get('initial_theta', 0)
-            logger.info(f"Using configured initial position: x={initial_x}, y={initial_y}, theta={initial_theta}")
-        else:
-            initial_x, initial_y = 0.0 , 0.0
-            initial_theta = 0.0
-            logger.info(f"Using (0.0,0.0,0.0) initial position: x={initial_x}, y={initial_y}, theta={initial_theta}")
+        # 优先从持久化文件加载上次位置，其次使用配置中的初始值，最后回退到(0,0,0)
+        initial_x, initial_y, initial_theta = 0.0, 0.0, 0.0
+        map_id = self.config['settings']['map_id']
+        position_initialized = True
+        loaded_from_persisted = False
+        try:
+            # 延迟导入以避免循环依赖
+            from SimulatorAGV.services.file_storage_manager import get_file_storage_manager
+            storage = get_file_storage_manager()
+            persisted = storage.get_state(self.config['vehicle']['serial_number'])
+            if persisted and isinstance(persisted, dict):
+                pos = persisted.get('agvPosition') or {}
+                initial_x = pos.get('x', initial_x)
+                initial_y = pos.get('y', initial_y)
+                initial_theta = pos.get('theta', initial_theta)
+                map_id = pos.get('mapId', map_id)
+                position_initialized = pos.get('positionInitialized', True)
+                loaded_from_persisted = True
+                logger.info(f"Using persisted position: x={initial_x}, y={initial_y}, theta={initial_theta}")
+        except Exception as e:
+            logger.warning(f"Failed to load persisted position: {e}")
         
-        state.agv_position = AgvPosition(x=initial_x, y=initial_y, theta=initial_theta, map_id=self.config['settings']['map_id'])
-        state.agv_position.position_initialized = True  # 设置为True，因为我们有明确的初始位置
+        if not loaded_from_persisted:
+            if 'initial_x' in self.config['settings'] and 'initial_y' in self.config['settings']:
+                initial_x = self.config['settings']['initial_x']
+                initial_y = self.config['settings']['initial_y']
+                initial_theta = self.config['settings'].get('initial_theta', 0.0)
+                logger.info(f"Using configured initial position: x={initial_x}, y={initial_y}, theta={initial_theta}")
+            else:
+                logger.info(f"Using (0.0,0.0,0.0) initial position: x={initial_x}, y={initial_y}, theta={initial_theta}")
+        
+        state.agv_position = AgvPosition(x=initial_x, y=initial_y, theta=initial_theta, map_id=map_id)
+        state.agv_position.position_initialized = position_initialized
         
         # 设置电池状态
         state.battery_state.battery_charge = 100.0

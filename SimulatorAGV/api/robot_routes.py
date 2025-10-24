@@ -102,23 +102,118 @@ def register_robot_routes(instance_manager):
     
     @registry.put("/api/robots/{robot_id}", "更新机器人信息")
     def update_robot(request: Dict[str, Any]) -> Dict[str, Any]:
-        """更新机器人信息"""
+        """更新机器人信息：
+        - 将名称、类型、IP、厂商写入 registered_robots.json
+        - 其余配置合并写入 robot_data/<serial>/state/current_state.json
+        """
         try:
+            import os
+            from pathlib import Path
+            from ..services.file_storage_manager import get_file_storage_manager
+
+
             robot_id = request["path_params"]["robot_id"]
-            update_data = request.get("body", {})
-            
-            # 获取机器人实例
-            robot_instance = instance_manager.get_robot_instance(robot_id)
-            if not robot_instance:
-                return {"error": f"机器人 {robot_id} 不存在"}
-            
-            # 这里可以添加更新机器人配置的逻辑
-            # 目前只返回成功消息
+            update_data = request.get("body", {}) or {}
+
+            # 允许 body 中提供 serialNumber，但以路径参数为准
+            serial_number = str(update_data.get("serialNumber") or robot_id)
+
+            # 1) 更新注册文件 registered_robots.json
+            registry_path = instance_manager.registry_path or os.path.join(os.getcwd(), "registered_robots.json")
+            robots_list = []
+            try:
+                if os.path.exists(registry_path):
+                    with open(registry_path, 'r', encoding='utf-8') as f:
+                        robots_list = json.load(f) or []
+            except Exception as e:
+                logger.warning(f"读取注册文件失败，使用空列表: {e}")
+                robots_list = []
+
+            # 查找并更新或追加条目
+            found = False
+            for robot in robots_list:
+                if robot.get("serialNumber") == serial_number:
+                    # 基本信息同步
+                    name_val = update_data.get("name") or update_data.get("robot_name")
+                    if name_val:
+                        robot["name"] = name_val
+                    if "type" in update_data:
+                        robot["type"] = update_data["type"]
+                    if "ip" in update_data:
+                        robot["ip"] = update_data["ip"]
+                    if "manufacturer" in update_data:
+                        robot["manufacturer"] = update_data["manufacturer"]
+                    found = True
+                    break
+            if not found:
+                # 若不存在则追加
+                new_entry = {
+                    "serialNumber": serial_number,
+                    "manufacturer": update_data.get("manufacturer", "SimulatorAGV"),
+                    "type": update_data.get("type", "AGV"),
+                    "ip": update_data.get("ip", "127.0.0.1"),
+                }
+                name_val = update_data.get("name") or update_data.get("robot_name")
+                if name_val:
+                    new_entry["name"] = name_val
+                robots_list.append(new_entry)
+
+            # 写回注册文件
+            try:
+                with open(registry_path, 'w', encoding='utf-8') as f:
+                    json.dump(robots_list, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                logger.error(f"写入注册文件失败: {e}")
+                return {"error": f"注册文件写入失败: {str(e)}"}
+
+            # 2) 合并其他配置到 current_state.json
+            fs = get_file_storage_manager()
+            state_file = Path(fs.base_path) / serial_number / "state" / "current_state.json"
+
+            existing_state = {}
+            try:
+                if state_file.exists():
+                    with open(state_file, 'r', encoding='utf-8') as f:
+                        existing_state = json.load(f) or {}
+            except Exception as e:
+                logger.warning(f"读取现有状态文件失败，使用空状态: {e}")
+                existing_state = {}
+
+            # 准备待合并的配置字段
+            merged_state = dict(existing_state)
+            if "battery" in update_data:
+                merged_state["battery"] = update_data["battery"]
+            if "maxSpeed" in update_data:
+                merged_state["maxSpeed"] = update_data["maxSpeed"]
+            # orientation 可能在 config.orientation 或直接提供
+            orientation = None
+            if isinstance(update_data.get("config"), dict) and "orientation" in update_data["config"]:
+                orientation = update_data["config"]["orientation"]
+            elif "orientation" in update_data:
+                orientation = update_data["orientation"]
+            if orientation is not None:
+                merged_state["orientation"] = orientation
+            # 初始位置：保存其 ID 以便追踪
+            if "initialPosition" in update_data:
+                merged_state["initialPositionId"] = update_data["initialPosition"]
+            # 版本
+            if "version" in update_data:
+                merged_state["version"] = update_data["version"]
+            # 标识冗余保存，便于外部关联
+            merged_state["serialNumber"] = serial_number
+
+            # 保存合并后的状态
+            try:
+                fs.save_state(serial_number, merged_state)
+            except Exception as e:
+                logger.error(f"保存状态文件失败: {e}")
+                return {"error": f"状态文件保存失败: {str(e)}"}
+
             return {
                 "success": True,
-                "message": f"机器人 {robot_id} 更新成功"
+                "message": f"机器人 {serial_number} 信息已更新并同步"
             }
-            
+        
         except Exception as e:
             logger.error(f"更新机器人失败: {e}")
             return {"error": str(e)}

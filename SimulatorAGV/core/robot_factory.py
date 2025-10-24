@@ -3,10 +3,10 @@ import sys
 from typing import Dict, Any, Optional
 
 # 添加项目路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from instances.robot_instance import RobotInstance
-from core.config_generator import ConfigGenerator
+from ..instances.robot_instance import RobotInstance
+from .config_generator import ConfigGenerator
 from shared import setup_logger
 
 logger = setup_logger()
@@ -39,24 +39,24 @@ class RobotFactory:
         创建单个机器人实例
         
         Args:
-            robot_info: 机器人信息，包含id, serialNumber, manufacturer等
+            robot_info: 机器人信息，包含serialNumber, manufacturer等
             
         Returns:
             创建的机器人实例，如果创建失败返回None
         """
         try:
-            robot_id = robot_info.get("id")
-            if not robot_id:
-                logger.error("机器人信息缺少ID")
+            serial_number = robot_info.get("serialNumber")
+            if not serial_number:
+                logger.error("机器人信息缺少serialNumber")
                 return None
             
             # 生成机器人配置
             robot_config = self.config_generator.generate_robot_config(robot_info)
             
-            # 创建机器人实例
-            robot_instance = RobotInstance(robot_id, robot_config)
+            # 创建机器人实例，使用serialNumber作为标识符
+            robot_instance = RobotInstance(serial_number, robot_config)
             
-            logger.info(f"成功创建机器人实例: {robot_id} ({robot_info.get('serialNumber', 'Unknown')})")
+            logger.info(f"成功创建机器人实例: {serial_number} ({robot_info.get('manufacturer', 'Unknown')})")
             return robot_instance
             
         except Exception as e:
@@ -71,7 +71,7 @@ class RobotFactory:
             registry_path: 注册文件路径
             
         Returns:
-            字典，键为机器人ID，值为机器人实例
+            字典，键为机器人serialNumber，值为机器人实例
         """
         robots = {}
         
@@ -83,9 +83,15 @@ class RobotFactory:
             for robot_info in robots_data:
                 robot_instance = self.create_robot_instance(robot_info)
                 if robot_instance:
-                    robots[robot_instance.robot_id] = robot_instance
+                    # 使用serialNumber作为字典的键
+                    serial_number = robot_info.get('serialNumber')
+                    if serial_number:
+                        robots[serial_number] = robot_instance
+                    else:
+                        logger.warning(f"机器人缺少serialNumber，使用robot_id作为键: {robot_instance.robot_id}")
+                        robots[robot_instance.robot_id] = robot_instance
                 else:
-                    logger.warning(f"跳过创建机器人: {robot_info.get('id', 'Unknown')}")
+                    logger.warning(f"跳过创建机器人: {robot_info.get('serialNumber', 'Unknown')}")
             
             logger.info(f"从注册文件创建了 {len(robots)} 个机器人实例")
             
@@ -98,20 +104,20 @@ class RobotFactory:
         
         return robots
     
-    def create_robot_from_config(self, robot_id: str, config: Dict[str, Any]) -> Optional[RobotInstance]:
+    def create_robot_from_config(self, serial_number: str, config: Dict[str, Any]) -> Optional[RobotInstance]:
         """
         从配置直接创建机器人实例
         
         Args:
-            robot_id: 机器人ID
+            serial_number: 机器人序列号
             config: 完整的机器人配置
             
         Returns:
             创建的机器人实例，如果创建失败返回None
         """
         try:
-            robot_instance = RobotInstance(robot_id, config)
-            logger.info(f"从配置创建机器人实例: {robot_id}")
+            robot_instance = RobotInstance(serial_number, config)
+            logger.info(f"从配置创建机器人实例: {serial_number}")
             return robot_instance
         except Exception as e:
             logger.error(f"从配置创建机器人实例失败: {e}")
@@ -127,7 +133,7 @@ class RobotFactory:
         Returns:
             验证结果
         """
-        required_fields = ["id", "serialNumber", "manufacturer", "type", "ip"]
+        required_fields = ["serialNumber", "manufacturer", "type", "ip"]
         
         for field in required_fields:
             if field not in robot_info:
@@ -153,12 +159,11 @@ class RobotFactory:
         
         return True
     
-    def get_default_robot_info(self, robot_id: str = None, serial_number: str = None) -> Dict[str, Any]:
+    def get_default_robot_info(self, serial_number: str = None) -> Dict[str, Any]:
         """
         获取默认的机器人信息模板
         
         Args:
-            robot_id: 机器人ID，如果不提供会自动生成
             serial_number: 序列号，如果不提供会自动生成
             
         Returns:
@@ -166,14 +171,10 @@ class RobotFactory:
         """
         import uuid
         
-        if not robot_id:
-            robot_id = str(uuid.uuid4())
-        
         if not serial_number:
             serial_number = f"AMB-{uuid.uuid4().hex[:6].upper()}"
         
         return {
-            "id": robot_id,
             "serialNumber": serial_number,
             "manufacturer": "SimulatorAGV",
             "type": "AMR",

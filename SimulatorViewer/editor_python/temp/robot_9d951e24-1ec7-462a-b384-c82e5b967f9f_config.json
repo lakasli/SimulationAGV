@@ -1,0 +1,21 @@
+[
+  {
+    "id": "9d951e24-1ec7-462a-b384-c82e5b967f9f",
+    "serialNumber": "AMB-02",
+    "manufacturer": "SEER",
+    "type": "AGV",
+    "ip": "192.168.9.2",
+    "status": "offline",
+    "position": {
+      "x": 0,
+      "y": 0,
+      "rotate": 0
+    },
+    "battery": 100.0,
+    "maxSpeed": 2.0,
+    "gid": "default",
+    "is_warning": false,
+    "is_fault": false,
+    "config": {}
+  }
+]

@@ -185,6 +185,17 @@ class RobotInfo:
     initial_position: Optional[Position] = None
     status: RobotStatusEnum = RobotStatusEnum.OFFLINE
     
+    # 扩展属性以支持web_api.py中的访问需求
+    speed: Optional[float] = None
+    battery: Optional[float] = None
+    position: Optional[Dict[str, Any]] = None
+    gid: str = "default"
+    is_warning: bool = False
+    is_fault: bool = False
+    last_update: Optional[str] = None
+    config: Optional[Dict[str, Any]] = None
+    properties: Optional[Dict[str, Any]] = None
+    
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         result = {
@@ -199,6 +210,26 @@ class RobotInfo:
         
         if self.initial_position:
             result["initialPosition"] = self.initial_position.to_dict()
+        
+        # 添加扩展属性到字典
+        if self.speed is not None:
+            result["speed"] = self.speed
+        if self.battery is not None:
+            result["battery"] = self.battery
+        if self.position is not None:
+            result["position"] = self.position
+        if self.gid:
+            result["gid"] = self.gid
+        if self.is_warning:
+            result["is_warning"] = self.is_warning
+        if self.is_fault:
+            result["is_fault"] = self.is_fault
+        if self.last_update:
+            result["last_update"] = self.last_update
+        if self.config:
+            result["config"] = self.config
+        if self.properties:
+            result["properties"] = self.properties
             
         return result
     
@@ -217,6 +248,17 @@ class RobotInfo:
         
         if 'initialPosition' in data:
             info.initial_position = Position.from_dict(data['initialPosition'])
+        
+        # 设置扩展属性
+        info.speed = data.get('speed')
+        info.battery = data.get('battery')
+        info.position = data.get('position')
+        info.gid = data.get('gid', 'default')
+        info.is_warning = data.get('is_warning', False)
+        info.is_fault = data.get('is_fault', False)
+        info.last_update = data.get('last_update')
+        info.config = data.get('config')
+        info.properties = data.get('properties')
             
         return info
 

@@ -70,32 +70,45 @@ class ConfigGenerator:
         Returns:
             机器人的完整配置
         """
-        # 深拷贝基础配置
-        robot_config = copy.deepcopy(self.base_config)
-        
-        # 更新车辆信息
-        robot_config["vehicle"]["serial_number"] = robot_info.get("serialNumber", f"AMB-{uuid.uuid4().hex[:6]}")
-        robot_config["vehicle"]["manufacturer"] = robot_info.get("manufacturer", "SimulatorAGV")
-        
-        # 更新MQTT配置，确保每个机器人有唯一的客户端ID
-        robot_config["mqtt_broker"]["client_id"] = f"{robot_config['vehicle']['manufacturer']}_{robot_config['vehicle']['serial_number']}_{int(datetime.now().timestamp())}"
+        # 使用新的配置格式
+        robot_config = {
+            "mqtt_broker": {
+                "host": "localhost",
+                "port": 1883,
+                "vda_interface": "uagv",
+                "client_id": f"{robot_info.get('manufacturer', 'SimulatorAGV')}_{robot_info.get('serialNumber', 'AMB-01')}_{int(datetime.now().timestamp())}"
+            },
+            "vehicle": {
+                "serial_number": robot_info.get("serialNumber", f"AMB-{uuid.uuid4().hex[:6]}"),
+                "manufacturer": robot_info.get("manufacturer", "SimulatorAGV"),
+                "vda_version": "v2",
+                "vda_full_version": "2.0.0"
+            },
+            "settings": {
+                "map_id": "default",
+                "state_frequency": 1,
+                "visualization_frequency": 1,
+                "action_time": 1.0,
+                "robot_count": 1,
+                "speed": 0.05,
+                "initial_x": 0.0,
+                "initial_y": 0.0,
+                "initial_theta": 0.0,
+                "initial_battery": 100.0,
+                "max_speed": 2.0,
+                "initial_orientation": 0,
+                "initial_position": "0"
+            },
+            "robot_id": robot_info.get("id", str(uuid.uuid4())),
+            "robot_type": robot_info.get("type", "AMR")
+        }
         
         # 添加机器人IP地址
         if "ip" in robot_info:
             robot_config["robot_ip"] = robot_info["ip"]
         
-        # 添加机器人ID和类型
-        robot_config["robot_id"] = robot_info.get("id", str(uuid.uuid4()))
-        robot_config["robot_type"] = robot_info.get("type", "AMR")
-        
-        # 设置默认的初始位置和状态
-        robot_config["settings"]["initial_x"] = 0.0
-        robot_config["settings"]["initial_y"] = 0.0
-        robot_config["settings"]["initial_theta"] = 0.0
-        robot_config["settings"]["initial_battery"] = 100.0
-        robot_config["settings"]["max_speed"] = 2.0
-        robot_config["settings"]["initial_orientation"] = 0
-        robot_config["settings"]["initial_position"] = "0"
+        # 使用serialNumber作为robot_id
+        robot_config["robot_id"] = robot_info.get("serialNumber", robot_config["robot_id"])
         
         return robot_config
     
@@ -107,7 +120,7 @@ class ConfigGenerator:
             registry_path: 注册文件路径
             
         Returns:
-            字典，键为机器人ID，值为配置
+            字典，键为机器人序列号，值为配置
         """
         try:
             with open(registry_path, 'r', encoding='utf-8') as f:
@@ -117,7 +130,8 @@ class ConfigGenerator:
         
         configs = {}
         for robot in robots:
-            robot_id = robot.get("id", str(uuid.uuid4()))
+            # 使用serialNumber作为唯一标识符，如果没有则生成默认值
+            robot_id = robot.get("serialNumber", f"ROBOT-{uuid.uuid4().hex[:8]}")
             configs[robot_id] = self.generate_robot_config(robot)
         
         return configs

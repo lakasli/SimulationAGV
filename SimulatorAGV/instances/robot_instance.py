@@ -7,11 +7,13 @@ from datetime import datetime
 # 导入现有的模块
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from agv_simulator import AgvSimulator
-from mqtt_client import MqttClient
-from vda5050.connection import Connection
+from ..agv_simulator import AgvSimulator
+from ..mqtt_client import MqttClient
+from ..vda5050.connection import Connection
+from ..services.file_storage_manager import get_file_storage_manager
+
 from shared import setup_logger
 
 logger = setup_logger()
@@ -32,6 +34,10 @@ class RobotInstance:
         self.config = config
         self.running = False
         self.thread: Optional[threading.Thread] = None
+        
+        # 初始化文件存储管理器
+        self.file_storage = get_file_storage_manager()
+        self.file_storage.create_robot_folder(robot_id)
         
         # 创建AGV模拟器
         self.agv_simulator = AgvSimulator(config)
@@ -56,11 +62,20 @@ class RobotInstance:
                 if topic.endswith("/order"):
                     order = self.mqtt_client.handle_order_message(payload)
                     if order:
+                        # 保存订单到文件
+                        order_data = json.loads(payload) if isinstance(payload, str) else payload
+                        self.file_storage.save_order(self.robot_id, order.order_id, order_data)
+                        
                         self.agv_simulator.accept_order(order)
                         logger.info(f"机器人 {self.robot_id} 接收到订单: {order.order_id}")
                 elif topic.endswith("/instantActions"):
                     instant_actions = self.mqtt_client.handle_instant_actions_message(payload)
                     if instant_actions:
+                        # 保存即时动作到文件
+                        action_data = json.loads(payload) if isinstance(payload, str) else payload
+                        action_id = f"action_{int(time.time() * 1000)}"  # 使用时间戳作为ID
+                        self.file_storage.save_instant_action(self.robot_id, action_id, action_data)
+                        
                         self.agv_simulator.accept_instant_actions(instant_actions)
                         logger.info(f"机器人 {self.robot_id} 接收到即时动作")
                 else:
@@ -109,6 +124,38 @@ class RobotInstance:
             
             # 发布初始连接消息
             self._publish_connection_message(Connection.CONNECTION_STATE_ONLINE)
+
+            # 尝试从文件加载已有状态并同步到模拟器
+            try:
+                state_data = self.file_storage.get_state(self.robot_id)
+                if state_data and isinstance(state_data, dict):
+                    pos = state_data.get("agvPosition") or {}
+                    x = pos.get("x", 0.0)
+                    y = pos.get("y", 0.0)
+                    theta = pos.get("theta", 0.0)
+                    with self._lock:
+                        if self.agv_simulator.state.agv_position:
+                            self.agv_simulator.state.agv_position.x = x
+                            self.agv_simulator.state.agv_position.y = y
+                            self.agv_simulator.state.agv_position.theta = theta
+                            self.agv_simulator.state.agv_position.position_initialized = pos.get("positionInitialized", True)
+                        else:
+                            from vda5050.state import AgvPosition
+                            map_id = pos.get("mapId", self.config['settings']['map_id'])
+                            self.agv_simulator.state.agv_position = AgvPosition(
+                                x=x, y=y, theta=theta,
+                                map_id=map_id,
+                                position_initialized=True
+                            )
+                        # 同步更新可视化位置
+                        if self.agv_simulator.visualization.agv_position:
+                            self.agv_simulator.visualization.agv_position.x = x
+                            self.agv_simulator.visualization.agv_position.y = y
+                            self.agv_simulator.visualization.agv_position.theta = theta
+                        else:
+                            self.agv_simulator.visualization.agv_position = self.agv_simulator.state.agv_position
+            except Exception as e:
+                logger.warning(f"加载机器人 {self.robot_id} 初始状态失败: {e}")
             
             # 发布初始状态消息
             self._publish_state_message()
@@ -155,6 +202,11 @@ class RobotInstance:
         try:
             self.agv_simulator.set_connection_state(state)
             message = self.agv_simulator.get_connection_message()
+            
+            # 保存连接消息到文件
+            connection_data = json.loads(message) if isinstance(message, str) else message
+            self.file_storage.save_connection(self.robot_id, connection_data)
+            
             self.mqtt_client.publish(
                 self.agv_simulator.connection_topic,
                 message,
@@ -168,6 +220,11 @@ class RobotInstance:
         """发布状态消息"""
         try:
             message = self.agv_simulator.get_state_message()
+            
+            # 保存状态消息到文件
+            state_data = json.loads(message) if isinstance(message, str) else message
+            self.file_storage.save_state(self.robot_id, state_data)
+            
             self.mqtt_client.publish(
                 self.agv_simulator.state_topic,
                 message,
@@ -180,6 +237,11 @@ class RobotInstance:
         """发布可视化消息"""
         try:
             message = self.agv_simulator.get_visualization_message()
+            
+            # 保存可视化消息到文件
+            visualization_data = json.loads(message) if isinstance(message, str) else message
+            self.file_storage.save_visualization(self.robot_id, visualization_data)
+            
             self.mqtt_client.publish(
                 self.agv_simulator.visualization_topic,
                 message,
@@ -203,13 +265,19 @@ class RobotInstance:
             except Exception as e:
                 logger.warning(f"获取机器人 {self.robot_id} 电池状态失败: {e}")
             
-            # 安全获取位置信息
-            position = None
+            # 从文件读取位置信息，确保与current_state.json一致
+            position = {"x": 0.0, "y": 0.0, "theta": 0.0}
             try:
-                if hasattr(self.agv_simulator.state, 'agv_position'):
-                    position = self.agv_simulator.state.agv_position
+                state_data = self.file_storage.get_state(self.robot_id)
+                if state_data and isinstance(state_data, dict):
+                    pos = state_data.get("agvPosition") or {}
+                    position = {
+                        "x": pos.get("x", 0.0),
+                        "y": pos.get("y", 0.0),
+                        "theta": pos.get("theta", 0.0)
+                    }
             except Exception as e:
-                logger.warning(f"获取机器人 {self.robot_id} 位置信息失败: {e}")
+                logger.warning(f"从状态文件读取机器人 {self.robot_id} 位置信息失败: {e}")
             
             # 安全获取订单ID
             current_order = None
@@ -271,7 +339,7 @@ class RobotInstance:
                 position_data = config_data['position']
                 x = position_data.get('x', 0.0)
                 y = position_data.get('y', 0.0)
-                theta = position_data.get('rotate', 0.0)
+                theta = position_data.get('theta', position_data.get('rotate', 0.0))
                 
                 # 更新AGV模拟器的位置
                 with self._lock:

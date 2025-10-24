@@ -76,8 +76,14 @@ def main():
             # 继续执行，不因为这个错误而停止
         
         if args.single:
-            # 单机器人模式
-            logger.info(f"启动单机器人模式，机器人ID: {args.single}")
+            # 单机器人模式 - 先加载注册文件中的机器人
+            logger.info(f"启动单机器人模式，机器人序列号: {args.single}")
+            
+            # 从注册文件加载机器人
+            loaded_count = manager.load_robots_from_registry()
+            logger.info(f"从注册文件加载了 {loaded_count} 个机器人实例")
+            
+            # 启动指定的机器人
             success = manager.start_robot(args.single)
             if not success:
                 logger.error(f"无法启动机器人 {args.single}")
@@ -87,16 +93,15 @@ def main():
             logger.info(f"创建 {args.robots} 个测试机器人")
             for i in range(args.robots):
                 robot_info = {
-                    "id": f"test_robot_{i+1:03d}",
                     "serialNumber": f"TEST{i+1:03d}",
                     "manufacturer": "TestManufacturer",
                     "type": "AGV",
-                    "ip": "127.0.0.1",
-                    "status": "IDLE",
-                    "position": {"x": i * 10, "y": 0, "theta": 0, "mapId": "test_map"},
-                    "battery": 100,
+                    "ip": f"192.168.1.{100+i}",
+                    "status": "offline",
+                    "position": {"x": 0, "y": 0, "rotate": 0},
+                    "battery": 100.0,
                     "maxSpeed": 2.0,
-                    "gid": f"test_gid_{i+1}",
+                    "gid": "default",
                     "is_warning": False,
                     "is_fault": False,
                     "config": {
@@ -114,19 +119,23 @@ def main():
             # 启动所有机器人
             manager.start_all()
         else:
-            # 从注册文件加载机器人
-            logger.info(f"从注册文件加载机器人: {registry_path}")
-            manager.load_robots_from_registry()
+            # 根据注册文件启动机器人实例
+            logger.info(f"机器人管理器已初始化，注册文件路径: {registry_path}")
+            logger.info("开始从注册文件加载机器人实例...")
             
-            # 启动所有机器人
+            # 从注册文件加载机器人
+            loaded_count = manager.load_robots_from_registry()
+            logger.info(f"从注册文件加载了 {loaded_count} 个机器人实例")
+            
+            # 启动管理器和所有机器人
             manager.start_all()
         
         # 显示运行状态
         status = manager.get_robot_status()
         logger.info(f"成功启动 {manager.get_robot_count()} 个机器人实例")
-        for robot_id in manager.get_robot_list():
-            robot_status = manager.get_robot_status(robot_id)
-            logger.info(f"  - {robot_id}: {robot_status['status']}")
+        for serial_number in manager.get_robot_list():
+            robot_status = manager.get_robot_status(serial_number)
+            logger.info(f"  - {serial_number}: {robot_status['status']}")
         
         logger.info("多机器人模拟器已启动，按 Ctrl+C 停止...")
         

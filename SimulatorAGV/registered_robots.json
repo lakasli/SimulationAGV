@@ -1,16 +1,8 @@
 [
   {
-    "id": "987383e9-7088-4312-b25d-ed43013327e4",
     "serialNumber": "AMB-01",
     "manufacturer": "SEER",
     "type": "AGV",
     "ip": "192.168.9.1"
-  },
-  {
-    "id": "88798196-6b9a-4899-8bf1-286be6a97252",
-    "serialNumber": "AMB-02",
-    "manufacturer": "SEER",
-    "type": "AGV",
-    "ip": "192.168.9.2"
   }
 ]

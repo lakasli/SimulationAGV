@@ -10,12 +10,12 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import threading
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-
 # 添加项目路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.robot_factory import RobotFactory
-from instances.robot_instance import RobotInstance
+from SimulatorAGV.services.file_storage_manager import get_file_storage_manager
+from SimulatorAGV.core.robot_factory import RobotFactory
+from SimulatorAGV.instances.robot_instance import RobotInstance
 from shared import setup_logger
 
 logger = setup_logger()
@@ -141,18 +141,18 @@ class InstanceManager:
         if not self.registry_path:
             logger.warning("未指定注册文件路径")
             return 0
-        
+
         with self._lock:
             # 创建机器人实例
             new_robots = self.robot_factory.create_robots_from_registry(self.registry_path)
             
             # 添加到管理器中
-            for robot_id, robot_instance in new_robots.items():
-                if robot_id not in self.robots:
-                    self.robots[robot_id] = robot_instance
-                    logger.info(f"加载机器人实例: {robot_id}")
+            for serial_number, robot_instance in new_robots.items():
+                if serial_number not in self.robots:
+                    self.robots[serial_number] = robot_instance
+                    logger.info(f"加载机器人实例: {serial_number}")
                 else:
-                    logger.warning(f"机器人实例已存在，跳过: {robot_id}")
+                    logger.warning(f"机器人实例已存在，跳过: {serial_number}")
         
         return len(new_robots)
     
@@ -171,57 +171,64 @@ class InstanceManager:
             if not self.robot_factory.validate_robot_info(robot_info):
                 return False
             
-            robot_id = robot_info["id"]
+            serial_number = robot_info["serialNumber"]
             
             with self._lock:
                 # 检查是否已存在
-                if robot_id in self.robots:
-                    logger.warning(f"机器人实例已存在: {robot_id}")
+                if serial_number in self.robots:
+                    logger.warning(f"机器人实例已存在: {serial_number}")
                     return False
                 
                 # 创建机器人实例
                 robot_instance = self.robot_factory.create_robot_instance(robot_info)
                 if robot_instance:
-                    self.robots[robot_id] = robot_instance
+                    self.robots[serial_number] = robot_instance
                     
                     # 如果管理器正在运行，立即启动新机器人
                     if self._running:
                         robot_instance.start()
                     
-                    logger.info(f"成功添加机器人实例: {robot_id}")
+                    logger.info(f"成功添加机器人实例: {serial_number}")
                     return True
                 else:
-                    logger.error(f"创建机器人实例失败: {robot_id}")
+                    logger.error(f"创建机器人实例失败: {serial_number}")
                     return False
         
         except Exception as e:
             logger.error(f"添加机器人实例时出错: {e}")
             return False
     
-    def remove_robot(self, robot_id: str) -> bool:
+    def remove_robot(self, serial_number: str) -> bool:
         """
         移除机器人实例
         
         Args:
-            robot_id: 机器人ID
+            serial_number: 机器人序列号
             
         Returns:
             移除是否成功
         """
         try:
             with self._lock:
-                if robot_id not in self.robots:
-                    logger.warning(f"机器人实例不存在: {robot_id}")
+                if serial_number not in self.robots:
+                    logger.warning(f"机器人实例不存在: {serial_number}")
                     return False
                 
                 # 停止机器人实例
-                robot_instance = self.robots[robot_id]
+                robot_instance = self.robots[serial_number]
                 robot_instance.stop()
                 
                 # 从管理器中移除
-                del self.robots[robot_id]
+                del self.robots[serial_number]
                 
-                logger.info(f"成功移除机器人实例: {robot_id}")
+                # 删除对应的文件存储目录
+                try:
+                    storage = get_file_storage_manager()
+                    storage.remove_robot_folder(serial_number)
+                except Exception as e:
+                    logger.error(f"删除机器人 {serial_number} 数据目录失败: {e}")
+                
+                logger.info(f"成功移除机器人实例: {serial_number}")
                 return True
         
         except Exception as e:
@@ -236,296 +243,213 @@ class InstanceManager:
             self._running = True
             
             # 启动所有机器人实例
-            for robot_id, robot_instance in self.robots.items():
+            for serial_number, robot_instance in self.robots.items():
                 try:
                     robot_instance.start()
-                    logger.info(f"机器人实例 {robot_id} 启动成功")
+                    logger.info(f"机器人实例 {serial_number} 启动成功")
                 except Exception as e:
-                    logger.error(f"启动机器人实例 {robot_id} 失败: {e}")
-            
-            # 启动监控线程
-            if self._monitor_thread is None or not self._monitor_thread.is_alive():
-                self._monitor_thread = threading.Thread(target=self._monitor_robots, daemon=True)
-                self._monitor_thread.start()
-                logger.info("机器人监控线程已启动")
+                    logger.error(f"机器人实例 {serial_number} 启动失败: {e}")
             
             # 启动文件监控
-            self._start_file_monitoring()
+            try:
+                self._start_file_monitoring()
+            except Exception as e:
+                logger.error(f"启动文件监控失败: {e}")
             
             # 启动API服务器
-            self.start_api_server()
-        
-        logger.info(f"所有机器人实例启动完成，共 {len(self.robots)} 个实例")
+            try:
+                self.start_api_server()
+            except Exception as e:
+                logger.error(f"启动API服务器失败: {e}")
     
-    def start_robot(self, robot_id: str) -> bool:
-        """
-        启动指定的机器人实例
-        
-        Args:
-            robot_id: 机器人ID
-            
-        Returns:
-            启动是否成功
-        """
+    def start_robot(self, serial_number: str) -> bool:
+        """启动指定机器人实例"""
         try:
             with self._lock:
-                if robot_id not in self.robots:
-                    logger.warning(f"机器人实例不存在: {robot_id}")
+                if serial_number not in self.robots:
+                    logger.warning(f"机器人实例不存在: {serial_number}")
                     return False
                 
-                robot_instance = self.robots[robot_id]
-                
-                # 启动机器人实例
+                robot_instance = self.robots[serial_number]
                 robot_instance.start()
-                
-                logger.info(f"成功启动机器人实例: {robot_id}")
+                logger.info(f"机器人实例 {serial_number} 启动成功")
                 return True
-        
         except Exception as e:
-            logger.error(f"启动机器人实例时出错: {e}")
+            logger.error(f"启动机器人实例失败: {e}")
             return False
     
-    def stop_robot(self, robot_id: str) -> bool:
-        """
-        停止指定的机器人实例
-        
-        Args:
-            robot_id: 机器人ID
-            
-        Returns:
-            停止是否成功
-        """
+    def stop_robot(self, serial_number: str) -> bool:
+        """停止指定机器人实例"""
         try:
             with self._lock:
-                if robot_id not in self.robots:
-                    logger.warning(f"机器人实例不存在: {robot_id}")
+                if serial_number not in self.robots:
+                    logger.warning(f"机器人实例不存在: {serial_number}")
                     return False
                 
-                robot_instance = self.robots[robot_id]
-                
-                # 停止机器人实例
+                robot_instance = self.robots[serial_number]
                 robot_instance.stop()
-                
-                logger.info(f"成功停止机器人实例: {robot_id}")
+                logger.info(f"机器人实例 {serial_number} 已停止")
                 return True
-        
         except Exception as e:
-            logger.error(f"停止机器人实例时出错: {e}")
+            logger.error(f"停止机器人实例失败: {e}")
             return False
-
+    
     def stop_all(self):
         """停止所有机器人实例"""
         logger.info("正在停止所有机器人实例...")
         
         with self._lock:
-            self._running = False
-            
-            # 停止文件监控
-            self._stop_file_monitoring()
-            
-            # 停止API服务器
-            self.stop_api_server()
-            
-            # 停止所有机器人实例
-            for robot_id, robot_instance in self.robots.items():
+            for serial_number, robot_instance in list(self.robots.items()):
                 try:
                     robot_instance.stop()
-                    logger.info(f"机器人实例 {robot_id} 停止成功")
+                    logger.info(f"机器人实例 {serial_number} 已停止")
                 except Exception as e:
-                    logger.error(f"停止机器人实例 {robot_id} 失败: {e}")
-        
-        logger.info("所有机器人实例停止完成")
-    
-    def restart_robot(self, robot_id: str) -> bool:
-        """
-        重启指定的机器人实例
-        
-        Args:
-            robot_id: 机器人ID
+                    logger.error(f"停止机器人实例 {serial_number} 失败: {e}")
             
-        Returns:
-            重启是否成功
-        """
+            # 停止文件监控
+            try:
+                self._stop_file_monitoring()
+            except Exception as e:
+                logger.error(f"停止文件监控失败: {e}")
+            
+            # 停止API服务器
+            try:
+                self.stop_api_server()
+            except Exception as e:
+                logger.error(f"停止API服务器失败: {e}")
+            
+            self._running = False
+    
+    def restart_robot(self, serial_number: str) -> bool:
+        """重启指定机器人实例"""
         try:
             with self._lock:
-                if robot_id not in self.robots:
-                    logger.warning(f"机器人实例不存在: {robot_id}")
+                if serial_number not in self.robots:
+                    logger.warning(f"机器人实例不存在: {serial_number}")
                     return False
                 
-                robot_instance = self.robots[robot_id]
-                
-                # 停止机器人实例
+                robot_instance = self.robots[serial_number]
                 robot_instance.stop()
-                
-                # 等待一段时间
                 time.sleep(1)
-                
-                # 重新启动
                 robot_instance.start()
-                
-                logger.info(f"成功重启机器人实例: {robot_id}")
+                logger.info(f"机器人实例 {serial_number} 重启成功")
                 return True
-        
         except Exception as e:
-            logger.error(f"重启机器人实例时出错: {e}")
+            logger.error(f"重启机器人实例失败: {e}")
             return False
     
-    def get_robot_status(self, robot_id: str = None) -> Dict[str, Any]:
-        """
-        获取机器人状态信息
-        
-        Args:
-            robot_id: 机器人ID，如果为None则返回所有机器人状态
-            
-        Returns:
-            机器人状态信息
-        """
+    def get_robot_status(self, serial_number: str = None) -> Dict[str, Any]:
+        """获取机器人状态信息"""
         with self._lock:
-            if robot_id:
-                if robot_id in self.robots:
-                    return self.robots[robot_id].get_status()
+            if serial_number:
+                robot = self.robots.get(serial_number)
+                if robot:
+                    return robot.get_status()
                 else:
-                    return {"error": f"机器人实例不存在: {robot_id}"}
+                    return {
+                        "error": "Robot not found",
+                        "serial_number": serial_number
+                    }
             else:
-                # 返回所有机器人状态
                 status = {
                     "total_robots": len(self.robots),
                     "running_robots": sum(1 for r in self.robots.values() if r.is_alive()),
                     "manager_running": self._running,
                     "robots": {}
                 }
-                
-                for rid, robot_instance in self.robots.items():
-                    status["robots"][rid] = robot_instance.get_status()
-                
+                for sn, robot in self.robots.items():
+                    status["robots"][sn] = robot.get_status()
                 return status
     
     def get_robot_list(self) -> List[str]:
-        """获取所有机器人ID列表"""
+        """获取机器人列表"""
         with self._lock:
             return list(self.robots.keys())
     
-    def get_robot_instance(self, robot_id: str) -> Optional[RobotInstance]:
-        """
-        获取机器人实例
-        
-        Args:
-            robot_id: 机器人ID
-            
-        Returns:
-            机器人实例，如果不存在返回None
-        """
+    def get_robot_instance(self, serial_number: str) -> Optional[RobotInstance]:
+        """获取机器人实例对象"""
         with self._lock:
-            return self.robots.get(robot_id)
+            return self.robots.get(serial_number)
     
-    def send_order_to_robot(self, robot_id: str, order_data: Dict[str, Any]) -> bool:
-        """
-        向指定机器人发送订单
-        
-        Args:
-            robot_id: 机器人ID
-            order_data: 订单数据
-            
-        Returns:
-            发送是否成功
-        """
-        robot_instance = self.get_robot_instance(robot_id)
-        if robot_instance:
-            robot_instance.send_order(order_data)
-            return True
-        else:
-            logger.warning(f"机器人实例不存在: {robot_id}")
+    def send_order_to_robot(self, serial_number: str, order_data: Dict[str, Any]) -> bool:
+        """向指定机器人发送订单"""
+        try:
+            with self._lock:
+                robot = self.robots.get(serial_number)
+                if robot:
+                    robot.send_order(order_data)
+                    return True
+                else:
+                    logger.warning(f"机器人实例不存在: {serial_number}")
+                    return False
+        except Exception as e:
+            logger.error(f"发送订单失败: {e}")
             return False
     
-    def send_instant_action_to_robot(self, robot_id: str, action_data: Dict[str, Any]) -> bool:
-        """
-        向指定机器人发送即时动作
-        
-        Args:
-            robot_id: 机器人ID
-            action_data: 动作数据
-            
-        Returns:
-            发送是否成功
-        """
-        robot_instance = self.get_robot_instance(robot_id)
-        if robot_instance:
-            robot_instance.send_instant_action(action_data)
-            return True
-        else:
-            logger.warning(f"机器人实例不存在: {robot_id}")
+    def send_instant_action_to_robot(self, serial_number: str, action_data: Dict[str, Any]) -> bool:
+        """向指定机器人发送即时动作"""
+        try:
+            with self._lock:
+                robot = self.robots.get(serial_number)
+                if robot:
+                    robot.send_instant_action(action_data)
+                    return True
+                else:
+                    logger.warning(f"机器人实例不存在: {serial_number}")
+                    return False
+        except Exception as e:
+            logger.error(f"发送即时动作失败: {e}")
             return False
     
     def _monitor_robots(self):
         """监控机器人实例状态"""
-        logger.info("启动机器人监控线程")
-        
         while self._running:
             try:
                 with self._lock:
-                    dead_robots = []
-                    
-                    # 检查每个机器人实例的状态
-                    for robot_id, robot_instance in self.robots.items():
-                        if not robot_instance.is_alive():
-                            dead_robots.append(robot_id)
-                    
-                    # 记录死亡的机器人实例
-                    for robot_id in dead_robots:
-                        logger.warning(f"检测到机器人实例异常停止: {robot_id}")
-                
-                # 等待一段时间再次检查
-                time.sleep(10)
-                
-            except Exception as e:
-                logger.error(f"监控机器人实例时出错: {e}")
+                    for serial_number, robot in list(self.robots.items()):
+                        if not robot.is_alive():
+                            logger.warning(f"检测到机器人实例不存活，尝试重启: {serial_number}")
+                            try:
+                                robot.start()
+                                logger.info(f"机器人实例 {serial_number} 重启成功")
+                            except Exception as e:
+                                logger.error(f"机器人实例 {serial_number} 重启失败: {e}")
                 time.sleep(5)
-        
-        logger.info("机器人监控线程已停止")
+            except Exception as e:
+                logger.error(f"监控线程出错: {e}")
+                time.sleep(5)
     
     def is_running(self) -> bool:
-         """检查管理器是否正在运行"""
-         return self._running
+        """检查管理器是否正在运行"""
+        return self._running
     
     def get_robot_count(self) -> int:
-        """获取机器人实例数量"""
+        """获取机器人数量"""
         with self._lock:
             return len(self.robots)
-
+    
     def start_api_server(self):
-        """启动API服务器"""
-        if self.api_server is not None:
-            return
-        
+        """启动状态API服务器"""
         try:
-            def create_handler(*args, **kwargs):
-                return StatusAPIHandler(*args, instance_manager=self, **kwargs)
-            
-            self.api_server = HTTPServer(('localhost', self.api_port), create_handler)
-            
-            def run_server():
-                logger.info(f"状态API服务器启动在 http://localhost:{self.api_port}")
-                self.api_server.serve_forever()
-            
-            self.api_thread = threading.Thread(target=run_server, daemon=True)
+            server_address = ('', self.api_port)
+            self.api_server = HTTPServer(server_address, lambda *args, **kwargs: StatusAPIHandler(*args, instance_manager=self, **kwargs))
+            self.api_thread = threading.Thread(target=self.api_server.serve_forever, daemon=True)
             self.api_thread.start()
-            
-            logger.info(f"API服务器已启动，端口: {self.api_port}")
+            logger.info(f"状态API服务器已启动，端口: {self.api_port}")
         except Exception as e:
-            logger.error(f"启动API服务器失败: {e}")
+            logger.error(f"启动状态API服务器失败: {e}")
     
     def stop_api_server(self):
-        """停止API服务器"""
-        if self.api_server:
-            try:
+        """停止状态API服务器"""
+        try:
+            if self.api_server:
                 self.api_server.shutdown()
                 self.api_server.server_close()
                 self.api_server = None
-                logger.info("API服务器已停止")
-            except Exception as e:
-                logger.error(f"停止API服务器失败: {e}")
-
-
+                logger.info("状态API服务器已停止")
+        except Exception as e:
+            logger.error(f"停止状态API服务器失败: {e}")
+    
     def _start_file_monitoring(self):
         """启动文件监控"""
         logger.info(f"Debug: registry_path = '{self.registry_path}'")
@@ -573,9 +497,9 @@ class InstanceManager:
                 logger.error(f"停止文件监控失败: {e}")
     
     def _reload_robots_from_registry(self):
-        """重新加载注册文件中的机器人"""
+        """重新加载注册文件中的机器人配置（仅热加载配置，不重新注册）"""
         try:
-            logger.info("开始重新加载机器人注册文件...")
+            logger.info("开始重新加载机器人注册文件配置...")
             
             if not self.registry_path or not os.path.exists(self.registry_path):
                 logger.warning("注册文件不存在，跳过重新加载")
@@ -588,26 +512,13 @@ class InstanceManager:
             # 获取当前已存在的机器人ID
             existing_robot_ids = set(self.robots.keys())
             
-            # 获取注册文件中的机器人ID
-            registry_robot_ids = set(robot_info.get('id') for robot_info in robots_data if robot_info.get('id'))
+            # 获取注册文件中的机器人serialNumber
+            registry_robot_ids = set(robot_info.get('serialNumber') for robot_info in robots_data if robot_info.get('serialNumber'))
             
-            # 找出新增的机器人
-            new_robot_ids = registry_robot_ids - existing_robot_ids
-            
-            # 找出已删除的机器人
+            # 找出已删除的机器人（从注册文件中移除的）
             removed_robot_ids = existing_robot_ids - registry_robot_ids
             
-            # 处理新增的机器人
-            for robot_info in robots_data:
-                robot_id = robot_info.get('id')
-                if robot_id in new_robot_ids:
-                    success = self.add_robot(robot_info)
-                    if success:
-                        logger.info(f"动态添加新机器人: {robot_id}")
-                    else:
-                        logger.error(f"动态添加机器人失败: {robot_id}")
-            
-            # 处理已删除的机器人
+            # 只处理已删除的机器人，不自动添加新机器人
             for robot_id in removed_robot_ids:
                 success = self.remove_robot(robot_id)
                 if success:
@@ -615,10 +526,58 @@ class InstanceManager:
                 else:
                     logger.error(f"动态移除机器人失败: {robot_id}")
             
-            logger.info(f"机器人注册文件重新加载完成，新增: {len(new_robot_ids)}, 移除: {len(removed_robot_ids)}")
+            # 对于现有机器人，只更新配置（热加载）
+            updated_count = 0
+            for robot_info in robots_data:
+                robot_id = robot_info.get('serialNumber')
+                if robot_id in existing_robot_ids:
+                    # 热加载配置
+                    if self._hot_reload_robot_config(robot_id, robot_info):
+                        updated_count += 1
+            
+            # 计算新增机器人并启动
+            new_robot_ids = registry_robot_ids - existing_robot_ids
+            added_count = 0
+            for robot_info in robots_data:
+                serial = robot_info.get('serialNumber')
+                if serial and serial in new_robot_ids:
+                    try:
+                        if self.add_robot(robot_info):
+                            added_count += 1
+                            logger.info(f"动态添加并启动新机器人: {serial}")
+                    except Exception as e:
+                        logger.error(f"动态添加新机器人失败 {serial}: {e}")
+            
+            logger.info(f"机器人注册文件重新加载完成，移除: {len(removed_robot_ids)}, 新增: {added_count}, 配置更新: {updated_count}")
+            if added_count > 0:
+                logger.info(f"已自动启动{added_count}个新注册机器人")
+            else:
+                logger.info("未检测到新的机器人注册，仅对现有实例进行配置热加载")
             
         except Exception as e:
             logger.error(f"重新加载机器人注册文件失败: {e}")
+    
+    def _hot_reload_robot_config(self, robot_id: str, new_config: Dict[str, Any]) -> bool:
+        """热加载机器人配置，不重启机器人实例"""
+        try:
+            if robot_id not in self.robots:
+                return False
+            
+            robot_instance = self.robots[robot_id]
+            
+            # 更新机器人配置（这里可以根据需要实现具体的配置更新逻辑）
+            # 例如更新MQTT配置、车辆信息等
+            if hasattr(robot_instance, 'update_config'):
+                robot_instance.update_config(new_config)
+                logger.info(f"热加载机器人配置成功: {robot_id}")
+                return True
+            else:
+                logger.warning(f"机器人实例不支持配置热加载: {robot_id}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"热加载机器人配置失败 {robot_id}: {e}")
+            return False
 
 
 class RobotRegistryHandler(FileSystemEventHandler):
